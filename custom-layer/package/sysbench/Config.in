@@ -1,0 +1,14 @@
+config BR2_PACKAGE_SYSBENCH
+	bool "sysbench"
+	depends on !BR2_STATIC_LIBS
+	depends on !BR2_PACKAGE_LUA
+	depends on BR2_PACKAGE_LUAJIT_ARCH_SUPPORTS
+	depends on !BR2_TOOLCHAIN_USES_UCLIBC
+	depends on BR2_USE_WCHAR
+	depends on BR2_TOOLCHAIN_HAS_THREADS
+	select BR2_PACKAGE_LUAJIT
+	select BR2_PACKAGE_CK
+	help
+	  Scriptable multi-threaded benchmark tool for
+	  databases and systems.
+	  https://github.com/akopytov/sysbench.git

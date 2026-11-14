@@ -1,0 +1,6 @@
+menu "Zewnętrzne pakiety"
+
+source "$BR2_EXTERNAL_CUSTOM_LAYER_PATH/package/sysbench/Config.in"
+source "$BR2_EXTERNAL_CUSTOM_LAYER_PATH/package/ck/Config.in"
+
+endmenu

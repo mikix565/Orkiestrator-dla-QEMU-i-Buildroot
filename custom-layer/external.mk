@@ -1,0 +1,1 @@
+include $(sort $(wildcard $(BR2_EXTERNAL_CUSTOM_LAYER_PATH)/package/*/*.mk))

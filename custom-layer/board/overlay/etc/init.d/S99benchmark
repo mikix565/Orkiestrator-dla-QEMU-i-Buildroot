@@ -1,0 +1,70 @@
+#!/bin/sh
+
+HOST_IP=10.0.2.2
+LOG=/tmp/bench.log
+DEFAULT_SCENARIOS="cpu:cpu::--cpu-max-prime=20000+mem:memory::--memory-block-size=64M,--memory-scope=local,--memory-total-size=100T,--time=10"
+
+cmdline_get() {
+    for a in $(cat /proc/cmdline); do
+        case "$a" in "$1="*) echo "${a#*=}"; return ;; esac
+    done
+}
+
+run_scenario() {
+    rest=$1
+    scenario_name=${rest%%:*}; rest=${rest#*:}
+    scenario_test=${rest%%:*}; rest=${rest#*:}
+    scenario_threads=${rest%%:*}; rest=${rest#*:}
+    arguments=""
+    pending=$rest
+    while [ -n "$pending" ]; do
+        arguments="$arguments ${pending%%,*}"
+        case "$pending" in
+            *,*) pending=${pending#*,} ;;
+            *) pending="" ;;
+        esac
+    done
+    echo "=== SCENARIO $scenario_name $scenario_test ==="
+    sysbench "$scenario_test" --threads="${scenario_threads:-$THREADS}" $arguments run
+}
+
+run_scenarios() {
+    remaining=$1
+    while [ -n "$remaining" ]; do
+        current=${remaining%%+*}
+        case "$remaining" in
+            *+*) remaining=${remaining#*+} ;;
+            *) remaining="" ;;
+        esac
+        run_scenario "$current"
+    done
+}
+
+run_benchmarks() {
+    BOOT_UPTIME=$(cut -d' ' -f1 /proc/uptime)
+    THREADS=$(cmdline_get bench.threads); THREADS=${THREADS:-1}
+    HOST_PORT=$(cmdline_get bench.port); HOST_PORT=${HOST_PORT:-1234}
+    SCENARIOS=$(cmdline_get bench.scenarios); SCENARIOS=${SCENARIOS:-$DEFAULT_SCENARIOS}
+
+    echo "BOOT_DONE uptime=$BOOT_UPTIME"
+
+    {
+        echo "=== META threads=$THREADS boot_uptime=$BOOT_UPTIME ==="
+        grep -E 'MemTotal|MemAvailable' /proc/meminfo
+        run_scenarios "$SCENARIOS"
+        echo "=== END ==="
+    } > "$LOG" 2>&1
+
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+        nc "$HOST_IP" "$HOST_PORT" < "$LOG" && break
+        sleep 1
+    done
+
+    poweroff
+}
+
+case "$1" in
+    start) run_benchmarks ;;
+    stop)  ;;
+    *)     echo "Usage: $0 {start|stop}" ;;
+esac

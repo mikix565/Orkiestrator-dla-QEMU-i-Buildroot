@@ -1,0 +1,1016 @@
+{
+  "experiment_id": "20261027-212235",
+  "started_at": "2026-10-27T21:22:35",
+  "host": {
+    "system": "Linux",
+    "kernel": "6.18.58-1-lts",
+    "machine": "x86_64",
+    "cpu_model": "Intel(R) Core(TM) i5-8600K CPU @ 3.60GHz",
+    "cpu_count": 6,
+    "mem_total_kb": 16307040,
+    "cpu_governor": "powersave",
+    "kvm_available": true
+  },
+  "software": {
+    "python": "3.14.8",
+    "qemu": "QEMU emulator version 11.1.2",
+    "buildroot": "2025.02.18",
+    "git_commit": "c9e7f519e444237b791e6a467944aa71aa949904",
+    "git_dirty": true
+  },
+  "experiment": {
+    "repetitions": 10,
+    "warmup_runs": 1,
+    "smp": 2,
+    "mem_mb": 512,
+    "kvm": true,
+    "timeout_s": 120,
+    "port": 1234,
+    "seed": 42,
+    "cpu_affinity": "",
+    "max_idle_busy_pct": 10
+  },
+  "scenarios": [
+    {
+      "name": "cpu",
+      "test": "cpu",
+      "options": [
+        [
+          "cpu-max-prime",
+          "20000"
+        ]
+      ],
+      "threads": null
+    },
+    {
+      "name": "mem",
+      "test": "memory",
+      "options": [
+        [
+          "memory-block-size",
+          "64M"
+        ],
+        [
+          "memory-scope",
+          "local"
+        ],
+        [
+          "memory-total-size",
+          "100T"
+        ],
+        [
+          "time",
+          "10"
+        ]
+      ],
+      "threads": null
+    },
+    {
+      "name": "mem_read",
+      "test": "memory",
+      "options": [
+        [
+          "memory-block-size",
+          "64M"
+        ],
+        [
+          "memory-oper",
+          "read"
+        ],
+        [
+          "memory-scope",
+          "local"
+        ],
+        [
+          "memory-total-size",
+          "100T"
+        ],
+        [
+          "time",
+          "10"
+        ]
+      ],
+      "threads": null
+    },
+    {
+      "name": "cpu_1t",
+      "test": "cpu",
+      "options": [
+        [
+          "cpu-max-prime",
+          "20000"
+        ]
+      ],
+      "threads": 1
+    }
+  ],
+  "variants": [
+    {
+      "name": "base",
+      "label": "glibc, -O2, default kernel",
+      "defconfig": null,
+      "defconfig_sha256": "6701e6891ad9c30a0852185461523f53caf9892d25ef5ae4ceb5a40a33e780f3",
+      "libc": "glibc",
+      "opt": "O2",
+      "kernel": "default"
+    },
+    {
+      "name": "musl",
+      "label": "musl, -O2, default kernel",
+      "defconfig": null,
+      "defconfig_sha256": "1226a9c9418248dd151affc88f29a3d6c13f952ab8cad784d83d7bf6ca1ac906",
+      "libc": "musl",
+      "opt": "O2",
+      "kernel": "default"
+    },
+    {
+      "name": "os",
+      "label": "glibc, -Os, default kernel",
+      "defconfig": null,
+      "defconfig_sha256": "754208ffd900b91b16fb352015a8a2095daf7da5675ed69592aeafc36881cfb3",
+      "libc": "glibc",
+      "opt": "Os",
+      "kernel": "default"
+    },
+    {
+      "name": "o3",
+      "label": "glibc, -O3, default kernel",
+      "defconfig": null,
+      "defconfig_sha256": "329396fc922b71f503eb021798992d643f39e340d432b26eea8473a35d4d7e50",
+      "libc": "glibc",
+      "opt": "O3",
+      "kernel": "default"
+    },
+    {
+      "name": "musl_os",
+      "label": "musl, -Os, default kernel",
+      "defconfig": null,
+      "defconfig_sha256": "34ca5de7852f7909ed79d45cece154f4646fb4e4c41629a2e3bf008003a0b10f",
+      "libc": "musl",
+      "opt": "Os",
+      "kernel": "default"
+    },
+    {
+      "name": "musl_o3",
+      "label": "musl, -O3, default kernel",
+      "defconfig": null,
+      "defconfig_sha256": "343ac8b6da84b29765e234738eb7232fc0d0684b1aa64ef43ade724c6a963059",
+      "libc": "musl",
+      "opt": "O3",
+      "kernel": "default"
+    },
+    {
+      "name": "base_tiny",
+      "label": "glibc, -O2, tiny kernel",
+      "defconfig": null,
+      "defconfig_sha256": "f7c8aab4a1d76d154c2fe2cf3c1175be01ead6d75ceba59b2f2c5b7cfd619537",
+      "libc": "glibc",
+      "opt": "O2",
+      "kernel": "tiny"
+    },
+    {
+      "name": "musl_tiny",
+      "label": "musl, -O2, tiny kernel",
+      "defconfig": null,
+      "defconfig_sha256": "e1350e761fb210de901bd299a6e1b2f530e365a543727f7025d7e03d4f197dfb",
+      "libc": "musl",
+      "opt": "O2",
+      "kernel": "tiny"
+    },
+    {
+      "name": "os_tiny",
+      "label": "glibc, -Os, tiny kernel",
+      "defconfig": null,
+      "defconfig_sha256": "95aaa5199c60604b5fd55b9d1ae2b0a7e83b92a49159fbc8b0331451a07450c6",
+      "libc": "glibc",
+      "opt": "Os",
+      "kernel": "tiny"
+    },
+    {
+      "name": "o3_tiny",
+      "label": "glibc, -O3, tiny kernel",
+      "defconfig": null,
+      "defconfig_sha256": "86397272c1199ffb98780e2aebdda7b00e5ee12047d0e9320d6a8b0682eb571c",
+      "libc": "glibc",
+      "opt": "O3",
+      "kernel": "tiny"
+    },
+    {
+      "name": "musl_os_tiny",
+      "label": "musl, -Os, tiny kernel",
+      "defconfig": null,
+      "defconfig_sha256": "006a63f638112054d79304cb94dd2003edf59eb83bfa3262c08169238ec471b5",
+      "libc": "musl",
+      "opt": "Os",
+      "kernel": "tiny"
+    },
+    {
+      "name": "musl_o3_tiny",
+      "label": "musl, -O3, tiny kernel",
+      "defconfig": null,
+      "defconfig_sha256": "05b134b58a567b0885ce45e9169bfe864d12c66cb822e4b4d607b0f973f65956",
+      "libc": "musl",
+      "opt": "O3",
+      "kernel": "tiny"
+    }
+  ],
+  "plan": [
+    {
+      "variant": "base",
+      "phase": "warmup",
+      "index": 1,
+      "order": 1
+    },
+    {
+      "variant": "musl",
+      "phase": "warmup",
+      "index": 1,
+      "order": 2
+    },
+    {
+      "variant": "os",
+      "phase": "warmup",
+      "index": 1,
+      "order": 3
+    },
+    {
+      "variant": "o3",
+      "phase": "warmup",
+      "index": 1,
+      "order": 4
+    },
+    {
+      "variant": "musl_os",
+      "phase": "warmup",
+      "index": 1,
+      "order": 5
+    },
+    {
+      "variant": "musl_o3",
+      "phase": "warmup",
+      "index": 1,
+      "order": 6
+    },
+    {
+      "variant": "base_tiny",
+      "phase": "warmup",
+      "index": 1,
+      "order": 7
+    },
+    {
+      "variant": "musl_tiny",
+      "phase": "warmup",
+      "index": 1,
+      "order": 8
+    },
+    {
+      "variant": "os_tiny",
+      "phase": "warmup",
+      "index": 1,
+      "order": 9
+    },
+    {
+      "variant": "o3_tiny",
+      "phase": "warmup",
+      "index": 1,
+      "order": 10
+    },
+    {
+      "variant": "musl_os_tiny",
+      "phase": "warmup",
+      "index": 1,
+      "order": 11
+    },
+    {
+      "variant": "musl_o3_tiny",
+      "phase": "warmup",
+      "index": 1,
+      "order": 12
+    },
+    {
+      "variant": "musl_tiny",
+      "phase": "measure",
+      "index": 1,
+      "order": 13
+    },
+    {
+      "variant": "musl_o3",
+      "phase": "measure",
+      "index": 1,
+      "order": 14
+    },
+    {
+      "variant": "os",
+      "phase": "measure",
+      "index": 1,
+      "order": 15
+    },
+    {
+      "variant": "os_tiny",
+      "phase": "measure",
+      "index": 1,
+      "order": 16
+    },
+    {
+      "variant": "o3_tiny",
+      "phase": "measure",
+      "index": 1,
+      "order": 17
+    },
+    {
+      "variant": "base_tiny",
+      "phase": "measure",
+      "index": 1,
+      "order": 18
+    },
+    {
+      "variant": "musl_o3_tiny",
+      "phase": "measure",
+      "index": 1,
+      "order": 19
+    },
+    {
+      "variant": "o3",
+      "phase": "measure",
+      "index": 1,
+      "order": 20
+    },
+    {
+      "variant": "musl_os",
+      "phase": "measure",
+      "index": 1,
+      "order": 21
+    },
+    {
+      "variant": "base",
+      "phase": "measure",
+      "index": 1,
+      "order": 22
+    },
+    {
+      "variant": "musl",
+      "phase": "measure",
+      "index": 1,
+      "order": 23
+    },
+    {
+      "variant": "musl_os_tiny",
+      "phase": "measure",
+      "index": 1,
+      "order": 24
+    },
+    {
+      "variant": "musl_o3",
+      "phase": "measure",
+      "index": 2,
+      "order": 25
+    },
+    {
+      "variant": "musl_tiny",
+      "phase": "measure",
+      "index": 2,
+      "order": 26
+    },
+    {
+      "variant": "os",
+      "phase": "measure",
+      "index": 2,
+      "order": 27
+    },
+    {
+      "variant": "o3_tiny",
+      "phase": "measure",
+      "index": 2,
+      "order": 28
+    },
+    {
+      "variant": "musl_os_tiny",
+      "phase": "measure",
+      "index": 2,
+      "order": 29
+    },
+    {
+      "variant": "base_tiny",
+      "phase": "measure",
+      "index": 2,
+      "order": 30
+    },
+    {
+      "variant": "musl_os",
+      "phase": "measure",
+      "index": 2,
+      "order": 31
+    },
+    {
+      "variant": "os_tiny",
+      "phase": "measure",
+      "index": 2,
+      "order": 32
+    },
+    {
+      "variant": "o3",
+      "phase": "measure",
+      "index": 2,
+      "order": 33
+    },
+    {
+      "variant": "musl",
+      "phase": "measure",
+      "index": 2,
+      "order": 34
+    },
+    {
+      "variant": "musl_o3_tiny",
+      "phase": "measure",
+      "index": 2,
+      "order": 35
+    },
+    {
+      "variant": "base",
+      "phase": "measure",
+      "index": 2,
+      "order": 36
+    },
+    {
+      "variant": "os_tiny",
+      "phase": "measure",
+      "index": 3,
+      "order": 37
+    },
+    {
+      "variant": "musl_os_tiny",
+      "phase": "measure",
+      "index": 3,
+      "order": 38
+    },
+    {
+      "variant": "musl_o3",
+      "phase": "measure",
+      "index": 3,
+      "order": 39
+    },
+    {
+      "variant": "os",
+      "phase": "measure",
+      "index": 3,
+      "order": 40
+    },
+    {
+      "variant": "musl_o3_tiny",
+      "phase": "measure",
+      "index": 3,
+      "order": 41
+    },
+    {
+      "variant": "musl",
+      "phase": "measure",
+      "index": 3,
+      "order": 42
+    },
+    {
+      "variant": "base_tiny",
+      "phase": "measure",
+      "index": 3,
+      "order": 43
+    },
+    {
+      "variant": "base",
+      "phase": "measure",
+      "index": 3,
+      "order": 44
+    },
+    {
+      "variant": "musl_os",
+      "phase": "measure",
+      "index": 3,
+      "order": 45
+    },
+    {
+      "variant": "o3_tiny",
+      "phase": "measure",
+      "index": 3,
+      "order": 46
+    },
+    {
+      "variant": "musl_tiny",
+      "phase": "measure",
+      "index": 3,
+      "order": 47
+    },
+    {
+      "variant": "o3",
+      "phase": "measure",
+      "index": 3,
+      "order": 48
+    },
+    {
+      "variant": "musl_o3_tiny",
+      "phase": "measure",
+      "index": 4,
+      "order": 49
+    },
+    {
+      "variant": "os_tiny",
+      "phase": "measure",
+      "index": 4,
+      "order": 50
+    },
+    {
+      "variant": "musl_tiny",
+      "phase": "measure",
+      "index": 4,
+      "order": 51
+    },
+    {
+      "variant": "musl_os",
+      "phase": "measure",
+      "index": 4,
+      "order": 52
+    },
+    {
+      "variant": "musl_os_tiny",
+      "phase": "measure",
+      "index": 4,
+      "order": 53
+    },
+    {
+      "variant": "os",
+      "phase": "measure",
+      "index": 4,
+      "order": 54
+    },
+    {
+      "variant": "base",
+      "phase": "measure",
+      "index": 4,
+      "order": 55
+    },
+    {
+      "variant": "base_tiny",
+      "phase": "measure",
+      "index": 4,
+      "order": 56
+    },
+    {
+      "variant": "o3_tiny",
+      "phase": "measure",
+      "index": 4,
+      "order": 57
+    },
+    {
+      "variant": "musl",
+      "phase": "measure",
+      "index": 4,
+      "order": 58
+    },
+    {
+      "variant": "musl_o3",
+      "phase": "measure",
+      "index": 4,
+      "order": 59
+    },
+    {
+      "variant": "o3",
+      "phase": "measure",
+      "index": 4,
+      "order": 60
+    },
+    {
+      "variant": "musl_o3_tiny",
+      "phase": "measure",
+      "index": 5,
+      "order": 61
+    },
+    {
+      "variant": "base",
+      "phase": "measure",
+      "index": 5,
+      "order": 62
+    },
+    {
+      "variant": "o3",
+      "phase": "measure",
+      "index": 5,
+      "order": 63
+    },
+    {
+      "variant": "os",
+      "phase": "measure",
+      "index": 5,
+      "order": 64
+    },
+    {
+      "variant": "musl_tiny",
+      "phase": "measure",
+      "index": 5,
+      "order": 65
+    },
+    {
+      "variant": "musl_o3",
+      "phase": "measure",
+      "index": 5,
+      "order": 66
+    },
+    {
+      "variant": "o3_tiny",
+      "phase": "measure",
+      "index": 5,
+      "order": 67
+    },
+    {
+      "variant": "musl_os",
+      "phase": "measure",
+      "index": 5,
+      "order": 68
+    },
+    {
+      "variant": "musl_os_tiny",
+      "phase": "measure",
+      "index": 5,
+      "order": 69
+    },
+    {
+      "variant": "base_tiny",
+      "phase": "measure",
+      "index": 5,
+      "order": 70
+    },
+    {
+      "variant": "musl",
+      "phase": "measure",
+      "index": 5,
+      "order": 71
+    },
+    {
+      "variant": "os_tiny",
+      "phase": "measure",
+      "index": 5,
+      "order": 72
+    },
+    {
+      "variant": "musl_tiny",
+      "phase": "measure",
+      "index": 6,
+      "order": 73
+    },
+    {
+      "variant": "os",
+      "phase": "measure",
+      "index": 6,
+      "order": 74
+    },
+    {
+      "variant": "musl_o3",
+      "phase": "measure",
+      "index": 6,
+      "order": 75
+    },
+    {
+      "variant": "os_tiny",
+      "phase": "measure",
+      "index": 6,
+      "order": 76
+    },
+    {
+      "variant": "base_tiny",
+      "phase": "measure",
+      "index": 6,
+      "order": 77
+    },
+    {
+      "variant": "musl_os_tiny",
+      "phase": "measure",
+      "index": 6,
+      "order": 78
+    },
+    {
+      "variant": "o3_tiny",
+      "phase": "measure",
+      "index": 6,
+      "order": 79
+    },
+    {
+      "variant": "musl_os",
+      "phase": "measure",
+      "index": 6,
+      "order": 80
+    },
+    {
+      "variant": "o3",
+      "phase": "measure",
+      "index": 6,
+      "order": 81
+    },
+    {
+      "variant": "base",
+      "phase": "measure",
+      "index": 6,
+      "order": 82
+    },
+    {
+      "variant": "musl",
+      "phase": "measure",
+      "index": 6,
+      "order": 83
+    },
+    {
+      "variant": "musl_o3_tiny",
+      "phase": "measure",
+      "index": 6,
+      "order": 84
+    },
+    {
+      "variant": "base_tiny",
+      "phase": "measure",
+      "index": 7,
+      "order": 85
+    },
+    {
+      "variant": "o3",
+      "phase": "measure",
+      "index": 7,
+      "order": 86
+    },
+    {
+      "variant": "musl_os",
+      "phase": "measure",
+      "index": 7,
+      "order": 87
+    },
+    {
+      "variant": "base",
+      "phase": "measure",
+      "index": 7,
+      "order": 88
+    },
+    {
+      "variant": "o3_tiny",
+      "phase": "measure",
+      "index": 7,
+      "order": 89
+    },
+    {
+      "variant": "musl_tiny",
+      "phase": "measure",
+      "index": 7,
+      "order": 90
+    },
+    {
+      "variant": "musl",
+      "phase": "measure",
+      "index": 7,
+      "order": 91
+    },
+    {
+      "variant": "os_tiny",
+      "phase": "measure",
+      "index": 7,
+      "order": 92
+    },
+    {
+      "variant": "musl_o3_tiny",
+      "phase": "measure",
+      "index": 7,
+      "order": 93
+    },
+    {
+      "variant": "os",
+      "phase": "measure",
+      "index": 7,
+      "order": 94
+    },
+    {
+      "variant": "musl_o3",
+      "phase": "measure",
+      "index": 7,
+      "order": 95
+    },
+    {
+      "variant": "musl_os_tiny",
+      "phase": "measure",
+      "index": 7,
+      "order": 96
+    },
+    {
+      "variant": "base",
+      "phase": "measure",
+      "index": 8,
+      "order": 97
+    },
+    {
+      "variant": "musl_os_tiny",
+      "phase": "measure",
+      "index": 8,
+      "order": 98
+    },
+    {
+      "variant": "musl_o3_tiny",
+      "phase": "measure",
+      "index": 8,
+      "order": 99
+    },
+    {
+      "variant": "musl",
+      "phase": "measure",
+      "index": 8,
+      "order": 100
+    },
+    {
+      "variant": "musl_os",
+      "phase": "measure",
+      "index": 8,
+      "order": 101
+    },
+    {
+      "variant": "musl_o3",
+      "phase": "measure",
+      "index": 8,
+      "order": 102
+    },
+    {
+      "variant": "o3_tiny",
+      "phase": "measure",
+      "index": 8,
+      "order": 103
+    },
+    {
+      "variant": "base_tiny",
+      "phase": "measure",
+      "index": 8,
+      "order": 104
+    },
+    {
+      "variant": "musl_tiny",
+      "phase": "measure",
+      "index": 8,
+      "order": 105
+    },
+    {
+      "variant": "os",
+      "phase": "measure",
+      "index": 8,
+      "order": 106
+    },
+    {
+      "variant": "o3",
+      "phase": "measure",
+      "index": 8,
+      "order": 107
+    },
+    {
+      "variant": "os_tiny",
+      "phase": "measure",
+      "index": 8,
+      "order": 108
+    },
+    {
+      "variant": "musl_os_tiny",
+      "phase": "measure",
+      "index": 9,
+      "order": 109
+    },
+    {
+      "variant": "musl_os",
+      "phase": "measure",
+      "index": 9,
+      "order": 110
+    },
+    {
+      "variant": "os_tiny",
+      "phase": "measure",
+      "index": 9,
+      "order": 111
+    },
+    {
+      "variant": "musl_tiny",
+      "phase": "measure",
+      "index": 9,
+      "order": 112
+    },
+    {
+      "variant": "musl",
+      "phase": "measure",
+      "index": 9,
+      "order": 113
+    },
+    {
+      "variant": "o3_tiny",
+      "phase": "measure",
+      "index": 9,
+      "order": 114
+    },
+    {
+      "variant": "os",
+      "phase": "measure",
+      "index": 9,
+      "order": 115
+    },
+    {
+      "variant": "base_tiny",
+      "phase": "measure",
+      "index": 9,
+      "order": 116
+    },
+    {
+      "variant": "musl_o3",
+      "phase": "measure",
+      "index": 9,
+      "order": 117
+    },
+    {
+      "variant": "musl_o3_tiny",
+      "phase": "measure",
+      "index": 9,
+      "order": 118
+    },
+    {
+      "variant": "o3",
+      "phase": "measure",
+      "index": 9,
+      "order": 119
+    },
+    {
+      "variant": "base",
+      "phase": "measure",
+      "index": 9,
+      "order": 120
+    },
+    {
+      "variant": "base",
+      "phase": "measure",
+      "index": 10,
+      "order": 121
+    },
+    {
+      "variant": "musl_o3",
+      "phase": "measure",
+      "index": 10,
+      "order": 122
+    },
+    {
+      "variant": "o3",
+      "phase": "measure",
+      "index": 10,
+      "order": 123
+    },
+    {
+      "variant": "os_tiny",
+      "phase": "measure",
+      "index": 10,
+      "order": 124
+    },
+    {
+      "variant": "o3_tiny",
+      "phase": "measure",
+      "index": 10,
+      "order": 125
+    },
+    {
+      "variant": "musl_o3_tiny",
+      "phase": "measure",
+      "index": 10,
+      "order": 126
+    },
+    {
+      "variant": "musl",
+      "phase": "measure",
+      "index": 10,
+      "order": 127
+    },
+    {
+      "variant": "musl_os",
+      "phase": "measure",
+      "index": 10,
+      "order": 128
+    },
+    {
+      "variant": "os",
+      "phase": "measure",
+      "index": 10,
+      "order": 129
+    },
+    {
+      "variant": "musl_tiny",
+      "phase": "measure",
+      "index": 10,
+      "order": 130
+    },
+    {
+      "variant": "musl_os_tiny",
+      "phase": "measure",
+      "index": 10,
+      "order": 131
+    },
+    {
+      "variant": "base_tiny",
+      "phase": "measure",
+      "index": 10,
+      "order": 132
+    }
+  ],
+  "finished_at": "2026-10-27T23:00:27",
+  "completed": true,
+  "status_counts": {
+    "ok": 132
+  }
+}

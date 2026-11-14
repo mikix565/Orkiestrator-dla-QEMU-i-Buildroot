@@ -1,0 +1,126 @@
+# Praca Inżynierska: profilowanie wariantów Buildroot w QEMU
+
+Orkiestrator w Pythonie automatyzuje pomiary charakterystyki zasobowej systemów Linux dla systemów wbudowanych. Dla każdego wariantu konfiguracji Buildroota (x86_64) buduje obraz, uruchamia go wielokrotnie w QEMU z KVM i zbiera: wyniki Sysbench (CPU i pamięć), czas rozruchu oraz pamięć zajętą po starcie systemu.
+## Wymagania
+
+Host:
+
+- Linux x86_64 z działającym KVM: prawo zapisu do /dev/kvm. Bez KVM można ustawić kvm = false w orchestrator/variants.toml, ale wyniki nie będą porównywalne z dołączoną kampanią.
+- Python 3.14. Kampanie wykonano na 3.14.8, testy przechodzą na 3.14.9. Inne wersje nie były sprawdzane.
+- QEMU (qemu-system-x86_64 w PATH, inną binarkę wskazuje opcja --qemu). Kampania końcowa: QEMU 11.1.2 (zapisane w meta.json).
+- GNU Make oraz narzędzia wymagane przez Buildroota: lista w rozdziale "System requirements" instrukcji Buildroota 2025.02.
+- Buildroot 2025.02.18. Nie jest częścią repozytorium (patrz Instalacja).
+- Wolny port TCP 1234 na 127.0.0.1 (zmiana: parametr port w variants.toml).
+- Miejsce na dysku: ok. 8-9 GB na zbudowany wariant, czyli ok. 100 GB dla wszystkich 12. Maszyna wirtualna dostaje domyślnie 512 MB RAM i 2 procesory.
+
+Pakiety Pythona (requirements.txt, wersje przypięte do użytych w pracy):
+
+- pandas: wczytywanie i grupowanie runs.csv, obliczanie średnich.
+- numpy: rozrzut punktów na wykresach pudełkowych (zależność pandasa, importowana też bezpośrednio).
+- matplotlib: wykresy słupkowe i pudełkowe (PNG i SVG).
+- pytest, pytest-cov: testy i pomiar pokrycia.
+
+## Instalacja
+
+Wszystkie polecenia z katalogu głównego repozytorium. Skrypt orch szuka interpretera w .venv w tym katalogu, więc środowisko musi nazywać się .venv.
+
+    python3 -m venv .venv
+    .venv/bin/pip install -r requirements.txt
+
+Orkiestrator oczekuje w katalogu projektu trzech katalogów: buildroot/, custom-layer/ i dl/. Katalog custom-layer/ jest w repozytorium. Katalog dl/ to cache pobieranych źródeł:
+
+    mkdir -p dl
+
+Buildroota pobierz ze strony https://buildroot.org/downloads/ (plik buildroot-2025.02.18.tar.xz) i rozpakuj tak, aby plik Makefile leżał w buildroot/Makefile. Jeśli chcesz tylko analizować dołączone wyniki bez budowania, wystarczy pusty katalog:
+
+    mkdir -p buildroot
+
+Sprawdzenie instalacji (testy z atrapami, bez QEMU i Buildroota):
+
+    cd orchestrator && ../.venv/bin/python -m pytest -q 2>&1 | tail -n 3
+
+## Szybki start: analiza dołączonych wyników
+
+Repozytorium zawiera surowe dane kampanii końcowej (20261027-212235: 12 wariantów, 10 powtórzeń każdego, 132 przebiegi pomiarowe i rozgrzewka). Po instalacji:
+
+    ./orch analyze --experiment 20261027-212235
+
+Polecenie wypisuje tabelę średnich i zapisuje w orchestrator/results/20261027-212235/analysis/ pliki averages.csv, averages.png, averages.svg, boxplots.png i boxplots.svg. Bez opcji --experiment analizowany jest najnowszy eksperyment w katalogu wyników.
+
+## Użycie
+
+Skrypt orch uruchamia orkiestrator z właściwego katalogu i interpretera, więc można go wywołać z dowolnego miejsca. Polecenia:
+
+    ./orch build
+    ./orch run
+    ./orch analyze
+    ./orch all
+
+Opcje ogólne, przed nazwą polecenia: --project-dir (katalog projektu, domyślnie wykrywany względem położenia kodu) i --config (plik konfiguracji). Ścieżki względne w tych opcjach są liczone od katalogu orchestrator/, więc podawaj ścieżki bezwzględne.
+
+- build: konfiguruje i buduje obrazy. Opcje: --variant NAZWA (można powtarzać, domyślnie wszystkie warianty) i --clean (czysta budowa). Czysta budowa trwała 20-25 minut na wariant na moim sprzęcie, przyrostowa kilkanaście sekund (odświeża overlay). Czasy i rozmiary trafiają do orchestrator/results/builds.csv, a czas budowy ma sens tylko dla budów z --clean. Zmiana opcji w już zbudowanym pakiecie bez --clean bywa pomijana przez Buildroota.
+- run: uruchamia eksperyment na zbudowanych obrazach. Opcje: --variant, --reps N (powtórzenia), --warmup N (rozgrzewka), --qemu BIN.
+- analyze: tabela i wykresy średnich oraz pudełkowe. Opcja --experiment ID.
+- all: build, run i analyze jednym poleceniem.
+
+Przykład krótkiego przebiegu dwóch wariantów (obrazy muszą być zbudowane):
+
+    ./orch run --variant base --variant base_tiny --reps 1 --warmup 1
+    ./orch analyze
+
+Rekomendacja, nie wymóg: czysta budowa wszystkich wariantów trwa kilka godzin, więc warto uruchomić ją w tmux lub screen, żeby zerwanie sesji jej nie przerwało.
+
+## Jak działa pomiar
+
+1. Konfiguracja wariantu: defconfig Buildroota składa się z custom-layer/factors/base.fragment i trzech fragmentów poziomów czynników (libc, opt, kernel). Zduplikowana opcja w dwóch fragmentach to błąd. Wygenerowane defconfigi trafiają do out/_defconfigs/, a katalogi wyjściowe do out/NAZWA/. Przed pomiarem program sprawdza, czy deklarowane czynniki zgadzają się z faktycznym out/NAZWA/.config.
+2. Pojedynczy przebieg: sonda obciążenia hosta przez 1 s (z /proc/stat), potem host otwiera nasłuch TCP na 127.0.0.1 i uruchamia QEMU (-kernel bzImage, dysk rootfs.ext2 przez virtio z snapshot=on, konsola szeregowa, KVM). Parametry dla gościa (liczba wątków, port, scenariusze) idą w linii poleceń jądra.
+3. Gość: skrypt S99benchmark (custom-layer/board/overlay/etc/init.d/) czyta /proc/cmdline, wypisuje na konsolę BOOT_DONE, zapisuje MemTotal i MemAvailable, uruchamia scenariusze Sysbench i wysyła raport przez nc na 10.0.2.2 (host widziany z sieci użytkownika QEMU), po czym wyłącza system.
+4. Dwa zegary rozruchu: boot_host_s (host: od startu procesu QEMU do linii BOOT_DONE na konsoli) i boot_uptime_s (gość: /proc/uptime w skrypcie startowym). Oba kończą się w skrypcie startowym, a nie w gotowości usług.
+5. Plan kampanii: rozgrzewka (po jednym przebiegu każdego wariantu, poza analizą), potem bloki pomiarowe, w których każdy wariant występuje raz w losowej kolejności (ziarno seed w variants.toml, domyślnie 42).
+6. Statusy przebiegu: ok, timeout, no_boot, no_report, truncated_report, qemu_failed, parse_error (szczegóły w kolumnie note). Przebieg przerwany po timeout_s (domyślnie 120 s).
+7. Analiza: bierze tylko przebiegi pomiarowe ze statusem ok i pomija te, w których przed startem host był zajęty ponad max_idle_busy_pct (domyślnie 10%). Pominięte przebiegi zostają w runs.csv. Zajęta pamięć to MemTotal minus MemAvailable po starcie.
+
+## Warianty i scenariusze
+
+Siatka 2x3x2 = 12 wariantów: libc (glibc, musl), optymalizacja (O2, O3, Os), jądro (default: board/qemu/x86_64/linux.config z Buildroota, tiny: custom-layer/board/linux-tiny.defconfig, jądro 6.12.27). Nazwy: base, musl, os, o3, musl_os, musl_o3 i odpowiedniki z końcówką _tiny.
+
+Scenariusze Sysbench (testy cpu i memory): cpu (2 wątki, cpu-max-prime=20000), mem (zapis, blok 64M, 10 s), mem_read (odczyt) i cpu_1t (1 wątek).
+
+Dodawanie wariantu: wpis [[variant]] w orchestrator/variants.toml z nazwą i trzema poziomami czynników. Nowy poziom czynnika to nowy plik custom-layer/factors/CZYNNIK/POZIOM.fragment. Dodawanie scenariusza: wpis [[scenario]] (przykłady w variants.toml). Opcje Sysbencha pochodzą z białej listy, scenariusze są kodowane w linii poleceń jądra (limit 1200 znaków, wartości tylko z znaków A-Za-z0-9._), a nazwa scenariusza staje się przedrostkiem kolumn w runs.csv.
+
+## Wyniki
+
+Każdy eksperyment tworzy katalog orchestrator/results/RRRRMMDD-GGMMSS/ z plikami:
+
+- runs.csv: wiersz na przebieg, dopisywany od razu z fsync (przerwana kampania nie gubi zapisanych wierszy). Kolumny: identyfikatory, czynniki, faza, status, boot_host_s, boot_uptime_s, pamięć gościa, sonda obciążenia hosta i metryki scenariuszy.
+- meta.json: wersje narzędzi, dane hosta, scenariusze i plan kampanii.
+- raw/: surowe raporty i logi konsoli.
+- analysis/: wyniki polecenia analyze.
+
+## Testy
+
+232 testy z atrapami zamiast QEMU (test_guest.py uruchamia prawdziwy S99benchmark z atrapą Sysbencha). Pokrycie kodu mierzy się z katalogu orchestrator:
+
+    cd orchestrator && ../.venv/bin/python -m pytest -q --cov=orchestrator --cov-report=term-missing
+
+Pokrycie całego pakietu wyniosło ok. 90% przy pierwszym pomiarze. Najniższe ma qemu_runner.py (31%), bo testy nie uruchamiają prawdziwego QEMU. Ta część jest weryfikowana kampaniami na prawdziwych obrazach.
+
+## Struktura repozytorium
+
+- orch: skrypt uruchamiający.
+- orchestrator/orchestrator/: kod (cli, config, variants, scenarios, builder, qemu_runner, parser, storage, hoststate, experiment, averages).
+- orchestrator/variants.toml: konfiguracja eksperymentu, wariantów i scenariuszy.
+- orchestrator/tests/: testy (tests/data to próbki raportów).
+- orchestrator/results/: wyniki.
+- custom-layer/: BR2_EXTERNAL (pakiety sysbench 1.0.20 i ck 0.7.2, fragmenty konfiguracji, overlay ze skryptem gościa).
+- requirements.txt: zależności Pythona.
+
+Katalogi buildroot/, dl/, out/ i .venv/ powstają lokalnie i nie są w repozytorium.
+
+## Ograniczenia
+
+- Wyniki są względne i pochodzą z jednego hosta (Intel i5-8600K, 16 GB RAM, Linux 6.18, governor powersave). Częstotliwość procesora nie była kontrolowana, a przypinanie do rdzeni (cpu_affinity) jest domyślnie wyłączone.
+- Przed kampanią zamknij programy w tle. Na zajętym hoście zakłócenia sięgały 3-9% w CPU i pamięci, a kampanie końcowe wykonano przy hoście bezczynnym w ponad 98%.
+- Czas rozruchu kończy się w skrypcie startowym, nie w pełnej gotowości usług i nie obejmuje firmware.
+- Mierzone są tylko Sysbench CPU i pamięć oraz pamięć zajęta po starcie. Zużycie zasobów w trakcie testu nie jest próbkowane.
+- Czas czystej budowy ma po jednym pomiarze, a dla wariantów base i musl nie ma go wcale.

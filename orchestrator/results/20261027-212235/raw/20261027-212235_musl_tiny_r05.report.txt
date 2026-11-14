@@ -1,0 +1,144 @@
+=== META threads=2 boot_uptime=0.42 ===
+MemTotal:         505548 kB
+MemAvailable:     491088 kB
+=== SCENARIO cpu cpu ===
+sysbench 1.0.20 (using system LuaJIT 2.1.1736781742)
+
+Running the test with following options:
+Number of threads: 2
+Initializing random number generator from current time
+
+
+Prime numbers limit: 20000
+
+Initializing worker threads...
+
+Threads started!
+
+CPU speed:
+    events per second:  1080.45
+
+General statistics:
+    total time:                          10.0012s
+    total number of events:              10807
+
+Latency (ms):
+         min:                                    1.84
+         avg:                                    1.85
+         max:                                    7.26
+         95th percentile:                        1.86
+         sum:                                20000.10
+
+Threads fairness:
+    events (avg/stddev):           5403.5000/1.50
+    execution time (avg/stddev):   10.0001/0.00
+
+=== SCENARIO mem memory ===
+sysbench 1.0.20 (using system LuaJIT 2.1.1736781742)
+
+Running the test with following options:
+Number of threads: 2
+Initializing random number generator from current time
+
+
+Running memory speed test with the following options:
+  block size: 65536KiB
+  total size: 104857600MiB
+  operation: write
+  scope: local
+
+Initializing worker threads...
+
+Threads started!
+
+Total operations: 3137 (  313.51 per second)
+
+200768.00 MiB transferred (20064.82 MiB/sec)
+
+
+General statistics:
+    total time:                          10.0049s
+    total number of events:              3137
+
+Latency (ms):
+         min:                                    5.06
+         avg:                                    6.38
+         max:                                    7.87
+         95th percentile:                        6.43
+         sum:                                20005.13
+
+Threads fairness:
+    events (avg/stddev):           1568.5000/3.50
+    execution time (avg/stddev):   10.0026/0.00
+
+=== SCENARIO mem_read memory ===
+sysbench 1.0.20 (using system LuaJIT 2.1.1736781742)
+
+Running the test with following options:
+Number of threads: 2
+Initializing random number generator from current time
+
+
+Running memory speed test with the following options:
+  block size: 65536KiB
+  total size: 104857600MiB
+  operation: read
+  scope: local
+
+Initializing worker threads...
+
+Threads started!
+
+Total operations: 5249 (  524.67 per second)
+
+335936.00 MiB transferred (33578.79 MiB/sec)
+
+
+General statistics:
+    total time:                          10.0033s
+    total number of events:              5249
+
+Latency (ms):
+         min:                                    3.66
+         avg:                                    3.81
+         max:                                    4.56
+         95th percentile:                        3.89
+         sum:                                20002.30
+
+Threads fairness:
+    events (avg/stddev):           2624.5000/7.50
+    execution time (avg/stddev):   10.0012/0.00
+
+=== SCENARIO cpu_1t cpu ===
+sysbench 1.0.20 (using system LuaJIT 2.1.1736781742)
+
+Running the test with following options:
+Number of threads: 1
+Initializing random number generator from current time
+
+
+Prime numbers limit: 20000
+
+Initializing worker threads...
+
+Threads started!
+
+CPU speed:
+    events per second:   541.46
+
+General statistics:
+    total time:                          10.0015s
+    total number of events:              5416
+
+Latency (ms):
+         min:                                    1.84
+         avg:                                    1.85
+         max:                                    2.01
+         95th percentile:                        1.86
+         sum:                                10000.64
+
+Threads fairness:
+    events (avg/stddev):           5416.0000/0.00
+    execution time (avg/stddev):   10.0006/0.00
+
+=== END ===

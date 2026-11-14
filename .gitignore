@@ -1,0 +1,13 @@
+buildroot/
+dl/
+ccache/
+out/
+.venv/
+config_backup
+__pycache__/
+.pytest_cache/
+orchestrator/results/builds/
+orchestrator/results/*/
+wynik_*.txt
+
+.coverage

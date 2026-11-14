@@ -1,0 +1,104 @@
+[experiment]
+repetitions = 10
+warmup_runs = 1
+smp = 2
+mem_mb = 512
+kvm = true
+timeout_s = 120
+port = 1234
+seed = 42
+cpu_affinity = ""
+max_idle_busy_pct = 10
+
+[[variant]]
+name = "base"
+libc = "glibc"
+opt = "O2"
+kernel = "default"
+
+[[variant]]
+name = "musl"
+libc = "musl"
+opt = "O2"
+kernel = "default"
+
+[[variant]]
+name = "os"
+libc = "glibc"
+opt = "Os"
+kernel = "default"
+
+[[variant]]
+name = "o3"
+libc = "glibc"
+opt = "O3"
+kernel = "default"
+
+[[variant]]
+name = "musl_os"
+libc = "musl"
+opt = "Os"
+kernel = "default"
+
+[[variant]]
+name = "musl_o3"
+libc = "musl"
+opt = "O3"
+kernel = "default"
+
+[[variant]]
+name = "base_tiny"
+libc = "glibc"
+opt = "O2"
+kernel = "tiny"
+
+[[variant]]
+name = "musl_tiny"
+libc = "musl"
+opt = "O2"
+kernel = "tiny"
+
+[[variant]]
+name = "os_tiny"
+libc = "glibc"
+opt = "Os"
+kernel = "tiny"
+
+[[variant]]
+name = "o3_tiny"
+libc = "glibc"
+opt = "O3"
+kernel = "tiny"
+
+[[variant]]
+name = "musl_os_tiny"
+libc = "musl"
+opt = "Os"
+kernel = "tiny"
+
+[[variant]]
+name = "musl_o3_tiny"
+libc = "musl"
+opt = "O3"
+kernel = "tiny"
+
+[[scenario]]
+name = "cpu"
+test = "cpu"
+options = { cpu-max-prime = 20000 }
+
+[[scenario]]
+name = "mem"
+test = "memory"
+options = { memory-block-size = "64M", memory-scope = "local", memory-total-size = "100T", time = 10 }
+
+[[scenario]]
+name = "mem_read"
+test = "memory"
+options = { memory-block-size = "64M", memory-oper = "read", memory-scope = "local", memory-total-size = "100T", time = 10 }
+
+[[scenario]]
+name = "cpu_1t"
+test = "cpu"
+threads = 1
+options = { cpu-max-prime = 20000 }
