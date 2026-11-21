@@ -6,6 +6,7 @@ import pytest
 from orchestrator.averages import (
     AnalysisError,
     compute_averages,
+    compute_stats,
     latest_experiment,
     measured,
     order_variants,
@@ -155,7 +156,14 @@ def test_run_averages_writes_files(tmp_path):
     messages = []
     table = run_averages(config, "20261027-212235", log=messages.append)
     output = directory / "analysis"
-    for name in ("averages.csv", "averages.png", "averages.svg", "boxplots.png", "boxplots.svg"):
+    for name in (
+        "averages.csv",
+        "stats.csv",
+        "averages.png",
+        "averages.svg",
+        "boxplots.png",
+        "boxplots.svg",
+    ):
         assert (output / name).stat().st_size > 0
     saved = pd.read_csv(output / "averages.csv")
     assert list(saved["variant"]) == ["base", "os", "musl_os_tiny"]
@@ -169,6 +177,48 @@ def test_run_averages_writes_files(tmp_path):
     assert base["mem_used_kb"] == pytest.approx(19999.0)
     assert list(table.index) == ["base", "os", "musl_os_tiny"]
     assert any("Zapisano" in message for message in messages)
+
+
+def test_compute_stats_values():
+    frame = pd.DataFrame({"variant": ["a"] * 4 + ["b"], "x": [1.0, 2.0, 3.0, 4.0, 7.0]})
+    stats = compute_stats(frame, [("x", "t", "u", "%.0f")], ["b", "a"])
+    assert list(stats["variant"]) == ["b", "a"]
+    assert list(stats["metric"]) == ["x", "x"]
+    a = stats[stats["variant"] == "a"].iloc[0]
+    assert a["n"] == 4
+    assert a["mean"] == pytest.approx(2.5)
+    assert a["std"] == pytest.approx(1.2909944487)
+    assert a["median"] == pytest.approx(2.5)
+    assert a["q1"] == pytest.approx(1.75)
+    assert a["q3"] == pytest.approx(3.25)
+    assert a["min"] == 1.0
+    assert a["max"] == 4.0
+    b = stats[stats["variant"] == "b"].iloc[0]
+    assert b["n"] == 1
+    assert pd.isna(b["std"])
+    assert b["median"] == 7.0
+
+
+def test_run_averages_writes_stats(tmp_path):
+    config = make_config(tmp_path)
+    directory = config.results_dir / "20261027-212235"
+    write_runs(directory)
+    run_averages(config, "20261027-212235", log=lambda message: None)
+    stats = pd.read_csv(directory / "analysis" / "stats.csv")
+    assert list(stats.columns) == [
+        "variant", "metric", "n", "mean", "std", "median", "q1", "q3", "min", "max"
+    ]
+    assert len(stats) == 3 * 7
+    assert list(stats["variant"].unique()) == ["base", "os", "musl_os_tiny"]
+    row = stats[(stats["variant"] == "base") & (stats["metric"] == "boot_host_s")].iloc[0]
+    assert row["n"] == 3
+    assert row["mean"] == pytest.approx(1.1)
+    assert row["std"] == pytest.approx(0.1)
+    assert row["median"] == pytest.approx(1.1)
+    assert row["q1"] == pytest.approx(1.05)
+    assert row["q3"] == pytest.approx(1.15)
+    assert row["min"] == pytest.approx(1.0)
+    assert row["max"] == pytest.approx(1.2)
 
 
 def test_run_averages_excludes_noisy_runs(tmp_path):

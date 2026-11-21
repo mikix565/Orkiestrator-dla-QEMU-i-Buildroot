@@ -138,6 +138,30 @@ def compute_averages(frame: pd.DataFrame, panels) -> pd.DataFrame:
     return table
 
 
+def compute_stats(frame: pd.DataFrame, panels, names: list[str]) -> pd.DataFrame:
+    rows = []
+    for name in names:
+        group = frame[frame["variant"] == name]
+        for panel in panels:
+            column = panel[0]
+            values = group[column].dropna()
+            rows.append(
+                {
+                    "variant": name,
+                    "metric": column,
+                    "n": len(values),
+                    "mean": values.mean(),
+                    "std": values.std(ddof=1),
+                    "median": values.median(),
+                    "q1": values.quantile(0.25),
+                    "q3": values.quantile(0.75),
+                    "min": values.min(),
+                    "max": values.max(),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
 def order_variants(table: pd.DataFrame) -> list[str]:
     if all(factor in table.columns for factor in FACTOR_COLUMNS):
         return sorted(
@@ -280,6 +304,9 @@ def run_averages(
     output.mkdir(exist_ok=True)
     csv_path = output / "averages.csv"
     table.to_csv(csv_path, index_label="variant")
+    stats = compute_stats(frame, panels, list(table.index))
+    stats_path = output / "stats.csv"
+    stats.to_csv(stats_path, index=False)
     sizes = sorted({int(value) for value in table["n"]})
     size_text = f"n = {sizes[0]} na wariant" if len(sizes) == 1 else "różna liczba przebiegów"
     title = f"Eksperyment {experiment_id}: średnie z przebiegów pomiarowych ({size_text})"
@@ -293,6 +320,6 @@ def run_averages(
     note = f", wykluczono {len(excluded)} przebiegów z zajętym hostem" if len(excluded) else ""
     log(f"Średnie wyniki, eksperyment {experiment_id}{note}")
     log(table.to_string(float_format=lambda value: f"{value:.2f}"))
-    for path in [csv_path, *paths]:
+    for path in [csv_path, stats_path, *paths]:
         log(f"Zapisano: {path}")
     return table

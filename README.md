@@ -5,11 +5,12 @@ Orkiestrator w Pythonie automatyzuje pomiary charakterystyki zasobowej systemów
 
 Host:
 
-- Linux x86_64 z działającym KVM: prawo zapisu do /dev/kvm. Bez KVM można ustawić kvm = false w orchestrator/variants.toml, ale wyniki nie będą porównywalne z dołączoną kampanią.
-- Python 3.14. Kampanie wykonano na 3.14.8, testy przechodzą na 3.14.9. Inne wersje nie były sprawdzane.
-- QEMU (qemu-system-x86_64 w PATH, inną binarkę wskazuje opcja --qemu). Kampania końcowa: QEMU 11.1.2 (zapisane w meta.json).
+- Linux x86_64 z działającym KVM: prawo zapisu do /dev/kvm. Bez KVM można ustawić kvm = false w orchestrator/variants.toml, ale wyniki nie będą porównywalne z dołączonymi kampaniami.
+- Python 3.14. Kampanię 20261027-212235 wykonano na 3.14.8, a kampanię 20261117-071832 i testy na 3.14.9. Inne wersje nie były sprawdzane.
+- QEMU (qemu-system-x86_64 w PATH, inną binarkę wskazuje opcja --qemu). Dołączone kampanie: QEMU 11.1.2 (20261027-212235) i 11.1.3 (20261117-071832), wersje zapisane w meta.json.
 - GNU Make oraz narzędzia wymagane przez Buildroota: lista w rozdziale "System requirements" instrukcji Buildroota 2025.02.
 - Buildroot 2025.02.18. Nie jest częścią repozytorium (patrz Instalacja).
+- Na hoście z biblioteką lz4 w wersji 1.11 budowa host-zstd w Buildroocie 2025.02.18 kończy się błędem kompilacji (nowsze lz4frame.h nie zawiera starej nazwy typu contentChecksum_t). Naprawia to łatka custom-layer/patches/zstd/0001-fileio-use-LZ4F_contentChecksum_t.patch, dołączana automatycznie przez BR2_GLOBAL_PATCH_DIR w custom-layer/factors/base.fragment.
 - Wolny port TCP 1234 na 127.0.0.1 (zmiana: parametr port w variants.toml).
 - Miejsce na dysku: ok. 8-9 GB na zbudowany wariant, czyli ok. 100 GB dla wszystkich 12. Maszyna wirtualna dostaje domyślnie 512 MB RAM i 2 procesory.
 
@@ -41,11 +42,16 @@ Sprawdzenie instalacji (testy z atrapami, bez QEMU i Buildroota):
 
 ## Szybki start: analiza dołączonych wyników
 
-Repozytorium zawiera surowe dane kampanii końcowej (20261027-212235: 12 wariantów, 10 powtórzeń każdego, 132 przebiegi pomiarowe i rozgrzewka). Po instalacji:
+Repozytorium zawiera surowe dane dwóch kampanii, każda z 12 wariantami po 10 powtórzeń (120 przebiegów pomiarowych i 12 rozgrzewkowych):
 
-    ./orch analyze --experiment 20261027-212235
+- 20261117-071832: kampania główna, której wyniki opisano w pracy; wszystkie warianty zbudowano przed nią od zera (czasy budowy w orchestrator/results/builds.csv),
+- 20261027-212235: wcześniejsza kampania z tym samym zestawem wariantów i scenariuszy, użyta do porównania powtarzalności wyników.
 
-Polecenie wypisuje tabelę średnich i zapisuje w orchestrator/results/20261027-212235/analysis/ pliki averages.csv, averages.png, averages.svg, boxplots.png i boxplots.svg. Bez opcji --experiment analizowany jest najnowszy eksperyment w katalogu wyników.
+Po instalacji:
+
+    ./orch analyze --experiment 20261117-071832
+
+Polecenie wypisuje tabelę średnich i zapisuje w orchestrator/results/20261117-071832/analysis/ pliki averages.csv, stats.csv, averages.png, averages.svg, boxplots.png i boxplots.svg. Plik stats.csv ma wiersz dla każdej pary wariant i metryka, z kolumnami n, mean, std (odchylenie standardowe z próby), median, q1, q3, min i max. Bez opcji --experiment analizowany jest najnowszy eksperyment w katalogu wyników.
 
 ## Użycie
 
@@ -99,7 +105,7 @@ Każdy eksperyment tworzy katalog orchestrator/results/RRRRMMDD-GGMMSS/ z plikam
 
 ## Testy
 
-232 testy z atrapami zamiast QEMU (test_guest.py uruchamia prawdziwy S99benchmark z atrapą Sysbencha). Pokrycie kodu mierzy się z katalogu orchestrator:
+234 testy z atrapami zamiast QEMU (test_guest.py uruchamia prawdziwy S99benchmark z atrapą Sysbencha). Pokrycie kodu mierzy się z katalogu orchestrator:
 
     cd orchestrator && ../.venv/bin/python -m pytest -q --cov=orchestrator --cov-report=term-missing
 
@@ -111,7 +117,7 @@ Pokrycie całego pakietu wyniosło ok. 90% przy pierwszym pomiarze. Najniższe m
 - orchestrator/orchestrator/: kod (cli, config, variants, scenarios, builder, qemu_runner, parser, storage, hoststate, experiment, averages).
 - orchestrator/variants.toml: konfiguracja eksperymentu, wariantów i scenariuszy.
 - orchestrator/tests/: testy (tests/data to próbki raportów).
-- orchestrator/results/: wyniki.
+- orchestrator/results/: wyniki (dwie kampanie i builds.csv).
 - custom-layer/: BR2_EXTERNAL (pakiety sysbench 1.0.20 i ck 0.7.2, fragmenty konfiguracji, overlay ze skryptem gościa).
 - requirements.txt: zależności Pythona.
 
@@ -123,4 +129,5 @@ Katalogi buildroot/, dl/, out/ i .venv/ powstają lokalnie i nie są w repozytor
 - Przed kampanią zamknij programy w tle. Na zajętym hoście zakłócenia sięgały 3-9% w CPU i pamięci, a kampanie końcowe wykonano przy hoście bezczynnym w ponad 98%.
 - Czas rozruchu kończy się w skrypcie startowym, nie w pełnej gotowości usług i nie obejmuje firmware.
 - Mierzone są tylko Sysbench CPU i pamięć oraz pamięć zajęta po starcie. Zużycie zasobów w trakcie testu nie jest próbkowane.
-- Czas czystej budowy ma po jednym pomiarze, a dla wariantów base i musl nie ma go wcale.
+- Czas czystej budowy ma po jednym pomiarze na wariant (budowy z 2026-11-17 przed kampanią 20261117-071832). W builds.csv są też starsze budowy oraz nieudana budowa base sprzed dodania łatki zstd, które należy pominąć przy porównaniach.
+- Między kampaniami zaktualizowano system hosta: jądro 6.18.58 do 6.18.60, QEMU 11.1.2 do 11.1.3, Python 3.14.8 do 3.14.9 oraz lz4 do wersji 1.11, która wymusiła łatkę zstd.
