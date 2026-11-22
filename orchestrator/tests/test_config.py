@@ -147,9 +147,9 @@ def test_factor_variant_loads(tmp_path):
     project = make_project(tmp_path, FACTOR_VARIANT)
     add_factors(project)
     variant = load_config(project).variants[0]
-    assert (variant.libc, variant.opt, variant.kernel) == ("musl", "Os", "tiny")
+    assert variant.factors == (("libc", "musl"), ("opt", "Os"), ("kernel", "tiny"))
     assert variant.defconfig is None
-    assert variant.label == "musl, -Os, tiny kernel"
+    assert variant.label == "musl, Os, tiny"
 
 
 def test_factor_variant_custom_label(tmp_path):
@@ -189,7 +189,74 @@ def test_legacy_and_factor_variants_can_be_mixed(tmp_path):
     variants = load_config(project).variants
     assert [variant.name for variant in variants] == ["base", "v"]
     assert variants[0].defconfig == "base_defconfig"
-    assert variants[0].libc is None
+    assert variants[0].factors == ()
+
+
+def test_factor_names_come_from_factor_directories(tmp_path):
+    project = make_project(tmp_path, FACTOR_VARIANT.replace('kernel = "tiny"\n', 'kernel = "tiny"\nfs = "ext4"\n'))
+    add_factors(project)
+    (project / "custom-layer" / "factors" / "fs").mkdir()
+    (project / "custom-layer" / "factors" / "fs" / "ext4.fragment").write_text("Z=y\n")
+    config = load_config(project)
+    assert config.factor_names == ("libc", "opt", "kernel", "fs")
+    assert config.variants[0].label == "musl, Os, tiny, ext4"
+
+
+def test_new_factor_directory_is_required_in_variants(tmp_path):
+    project = make_project(tmp_path, FACTOR_VARIANT)
+    add_factors(project)
+    (project / "custom-layer" / "factors" / "fs").mkdir()
+    (project / "custom-layer" / "factors" / "fs" / "ext4.fragment").write_text("Z=y\n")
+    with pytest.raises(ConfigError, match="brak czynników fs"):
+        load_config(project)
+
+
+def test_factor_order_follows_first_variant(tmp_path):
+    toml = '[[variant]]\nname = "v"\nkernel = "tiny"\nlibc = "musl"\nopt = "Os"\n'
+    project = make_project(tmp_path, toml)
+    add_factors(project)
+    assert load_config(project).factor_names == ("kernel", "libc", "opt")
+
+
+PLOT = FACTOR_VARIANT + '[[variant]]\nname = "w"\nlibc = "glibc"\nopt = "O2"\nkernel = "default"\n'
+
+
+def test_plot_options_loaded(tmp_path):
+    toml = PLOT + (
+        '[plot]\ncolumns = 4\ncolor_by = "libc"\nhatch_by = "kernel"\n'
+        'colors = { glibc = "tab:blue", musl = "#ff8800" }\nhatches = { tiny = "//" }\n'
+        'order = { opt = ["O2", "Os"] }\nsort_by = ["kernel", "libc", "opt"]\n'
+    )
+    project = make_project(tmp_path, toml)
+    add_factors(project)
+    plot = load_config(project).plot
+    assert plot.columns == 4 and plot.rows is None
+    assert (plot.color_by, plot.hatch_by) == ("libc", "kernel")
+    assert dict(plot.colors) == {"glibc": "tab:blue", "musl": "#ff8800"}
+    assert dict(plot.hatches) == {"tiny": "//"}
+    assert plot.order == (("opt", ("O2", "Os")),)
+    assert plot.sort_by == ("kernel", "libc", "opt")
+
+
+@pytest.mark.parametrize(
+    "plot, fragment",
+    [
+        ("columns = 0\n", "columns"),
+        ('color_by = "fs"\n', "nieznany czynnik"),
+        ('color_by = "libc"\ncolors = { glibcx = "red" }\n', "nie jest poziomem"),
+        ('color_by = "libc"\ncolors = { glibc = "niekolor" }\n', "nieznany kolor"),
+        ('hatch_by = "kernel"\nhatches = { tiny = "ab" }\n', "wzór kreskowania"),
+        ('hatches = { tiny = "//" }\n', "hatch_by"),
+        ('order = { opt = ["O9"] }\n', "nieznane poziomy"),
+        ('sort_by = ["fs"]\n', "sort_by"),
+        ("dziwne = 1\n", "nieznane klucze"),
+    ],
+)
+def test_plot_options_errors(tmp_path, plot, fragment):
+    project = make_project(tmp_path, PLOT + "[plot]\n" + plot)
+    add_factors(project)
+    with pytest.raises(ConfigError, match=fragment):
+        load_config(project)
 
 
 from orchestrator.scenarios import DEFAULT_SCENARIOS, Scenario

@@ -161,7 +161,9 @@ def build_variant(
     clean_build = not (out / ".config").exists()
     prepare_defconfig(config, variant)
     started = time.monotonic()
-    source = variant.defconfig or f"czynniki: {variant.libc}, {variant.opt}, {variant.kernel}"
+    source = variant.defconfig or "czynniki: " + ", ".join(
+        f"{factor}={level}" for factor, level in variant.factors
+    )
     log(f"[{variant.name}] konfiguracja ({source})")
     code = runner(configure_command(config, variant), config.buildroot_dir, log_path)
     if code == 0:

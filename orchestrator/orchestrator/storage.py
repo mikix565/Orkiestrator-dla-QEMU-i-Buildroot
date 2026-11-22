@@ -9,14 +9,15 @@ from orchestrator.parser import META_COLUMNS, Report
 from orchestrator.scenarios import DEFAULT_SCENARIOS, scenario_columns
 from orchestrator.qemu_runner import RunResult
 
-BASE_COLUMNS = (
+from orchestrator.config import LEGACY_FACTORS
+
+ID_COLUMNS = (
     "run_id",
     "experiment_id",
     "variant",
     "label",
-    "libc",
-    "opt",
-    "kernel",
+)
+BASE_COLUMNS = (
     "phase",
     "index",
     "order",
@@ -37,8 +38,8 @@ class StorageError(Exception):
     pass
 
 
-def run_columns(scenarios) -> tuple[str, ...]:
-    columns = BASE_COLUMNS + META_COLUMNS
+def run_columns(scenarios, factors=LEGACY_FACTORS) -> tuple[str, ...]:
+    columns = ID_COLUMNS + tuple(factors) + BASE_COLUMNS + META_COLUMNS
     for scenario in scenarios:
         columns += scenario_columns(scenario)
     duplicates = sorted({name for name in columns if columns.count(name) > 1})
@@ -66,10 +67,8 @@ def build_row(
     experiment_id: str,
     variant: str,
     label: str,
-    libc: str,
     phase: str,
-    opt: str = "unknown",
-    kernel: str = "unknown",
+    factors: dict | None = None,
     index: int,
     order: int,
     result: RunResult,
@@ -82,9 +81,7 @@ def build_row(
         "experiment_id": experiment_id,
         "variant": variant,
         "label": label,
-        "libc": libc,
-        "opt": opt,
-        "kernel": kernel,
+        **(factors or {}),
         "phase": phase,
         "index": index,
         "order": order,

@@ -13,7 +13,7 @@ from orchestrator.variants import (
     prepare_defconfig,
 )
 
-FACTOR = Variant("v", None, "v", libc="musl", opt="Os", kernel="tiny")
+FACTOR = Variant("v", None, "v", factors=(("libc", "musl"), ("opt", "Os"), ("kernel", "tiny")))
 LEGACY = Variant("old", "old_defconfig", "old")
 
 

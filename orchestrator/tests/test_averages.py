@@ -7,7 +7,9 @@ from orchestrator.averages import (
     AnalysisError,
     compute_averages,
     compute_stats,
+    grid_shape,
     latest_experiment,
+    make_style,
     measured,
     order_variants,
     panels_for,
@@ -17,7 +19,7 @@ from orchestrator.averages import (
     scenario_pairs,
     split_by_host_load,
 )
-from orchestrator.config import Config, Experiment, Variant
+from orchestrator.config import Config, Experiment, PlotOptions, Variant
 
 SCENARIOS = [
     {"name": "cpu", "test": "cpu"},
@@ -104,7 +106,71 @@ def test_order_groups_by_kernel_then_libc_then_opt():
         },
         index=["base", "musl_os_tiny", "os_tiny", "musl", "o3"],
     )
-    assert order_variants(table) == ["base", "o3", "musl", "os_tiny", "musl_os_tiny"]
+    plot = PlotOptions(sort_by=("kernel", "libc", "opt"), order=(("opt", ("O2", "O3", "Os")),))
+    assert order_variants(table, plot=plot) == ["base", "o3", "musl", "os_tiny", "musl_os_tiny"]
+
+
+def test_order_default_follows_factor_and_level_appearance():
+    table = pd.DataFrame(
+        {"libc": ["musl", "glibc", "glibc"], "opt": ["O2", "Os", "O2"]},
+        index=["m", "gs", "g"],
+    )
+    appearance = {"libc": ["glibc", "musl"], "opt": ["O2", "Os"]}
+    assert order_variants(table, ["libc", "opt"], appearance=appearance) == ["g", "gs", "m"]
+
+
+@pytest.mark.parametrize(
+    "count, plot, expected",
+    [
+        (7, PlotOptions(), (3, 3)),
+        (16, PlotOptions(), (4, 4)),
+        (5, PlotOptions(), (2, 3)),
+        (7, PlotOptions(columns=4), (2, 4)),
+        (7, PlotOptions(rows=1), (1, 7)),
+        (6, PlotOptions(rows=2, columns=3), (2, 3)),
+    ],
+)
+def test_grid_shape(count, plot, expected):
+    assert grid_shape(count, plot) == expected
+
+
+def test_grid_shape_too_small_raises():
+    with pytest.raises(AnalysisError):
+        grid_shape(7, PlotOptions(rows=2, columns=3))
+
+
+def test_style_uses_configured_colors_and_hatches():
+    table = pd.DataFrame(
+        {"libc": ["glibc", "musl"], "kernel": ["default", "tiny"]}, index=["a", "b"]
+    )
+    plot = PlotOptions(
+        color_by="libc",
+        hatch_by="kernel",
+        colors=(("musl", "red"),),
+        hatches=(("tiny", "//"),),
+    )
+    appearance = {"libc": ["glibc", "musl"], "kernel": ["default", "tiny"]}
+    style = make_style(table, ["libc", "kernel"], plot, appearance)
+    assert style.colors == ("tab:blue", "red")
+    assert style.hatches == ("", "//")
+    assert [label for _, _, label in style.legend] == [
+        "libc: glibc",
+        "libc: musl",
+        "kernel: tiny (kreskowanie)",
+    ]
+
+
+def test_style_defaults_to_first_factor_without_hatching():
+    table = pd.DataFrame({"fs": ["a", "b"], "libc": ["x", "x"]}, index=["v1", "v2"])
+    style = make_style(table, ["fs", "libc"], PlotOptions(), {"fs": ["a", "b"], "libc": ["x"]})
+    assert style.colors == ("tab:blue", "tab:orange")
+    assert style.hatches == ("", "")
+
+
+def test_style_ignores_factor_missing_in_campaign():
+    table = pd.DataFrame({"libc": ["glibc"]}, index=["a"])
+    style = make_style(table, ["libc"], PlotOptions(color_by="fs"), {"libc": ["glibc"]})
+    assert style.colors == ("tab:gray",)
 
 
 def test_order_without_factors_is_alphabetical():

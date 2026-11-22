@@ -1,7 +1,7 @@
 import hashlib
 from pathlib import Path
 
-from orchestrator.config import FACTOR_NAMES, Config, ConfigError, Variant
+from orchestrator.config import Config, ConfigError, Variant
 
 
 class VariantError(ConfigError):
@@ -22,14 +22,30 @@ def option_name(line: str) -> str | None:
     return None
 
 
+def factor_fragments(config: Config, variant: Variant) -> list[tuple[str, str, Path]]:
+    factors_dir = config.external_dir / "factors"
+    return [
+        (factor, level, factors_dir / factor / f"{level}.fragment")
+        for factor, level in variant.factors
+    ]
+
+
+def fragment_options(text: str) -> list[tuple[str, str]]:
+    options = []
+    for line in text.splitlines():
+        line = line.rstrip()
+        name = option_name(line) if line.strip() else None
+        if name is not None:
+            options.append((name, line))
+    return options
+
+
 def compose_defconfig(config: Config, variant: Variant) -> str:
     if not uses_factors(variant):
         raise VariantError(f"wariant {variant.name} używa gotowego defconfigu, nie czynników")
     factors_dir = config.external_dir / "factors"
     parts = [factors_dir / "base.fragment"]
-    parts += [
-        factors_dir / factor / f"{getattr(variant, factor)}.fragment" for factor in FACTOR_NAMES
-    ]
+    parts += [path for _, _, path in factor_fragments(config, variant)]
     seen: dict[str, Path] = {}
     lines: list[str] = []
     for part in parts:

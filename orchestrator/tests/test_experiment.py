@@ -122,8 +122,6 @@ def test_run_experiment_writes_all_rows(tmp_path):
     rows = read_rows(store)
     assert len(rows) == 6
     assert len({row["run_id"] for row in rows}) == 6
-    assert {row["libc"] for row in rows if row["variant"] == "musl"} == {"musl"}
-    assert {row["libc"] for row in rows if row["variant"] == "base"} == {"glibc"}
     assert Counter(row["phase"] for row in rows) == {"warmup": 2, "measure": 4}
     assert len(list(store.raw_dir.iterdir())) == 12
     meta = json.loads(store.meta_file.read_text(encoding="utf-8"))
@@ -250,75 +248,39 @@ def test_ok_run_has_empty_note(tmp_path):
     assert {row["note"] for row in read_rows(store)} == {""}
 
 
-from orchestrator.experiment import detect_kernel, detect_opt
-
-
 def write_config(tmp_path, name, text):
     directory = tmp_path / "out" / name
     directory.mkdir(parents=True, exist_ok=True)
     (directory / ".config").write_text(text)
 
 
-@pytest.mark.parametrize("symbol, expected", [("2", "O2"), ("3", "O3"), ("S", "Os")])
-def test_detect_opt(tmp_path, symbol, expected):
-    write_config(tmp_path, "v", f"BR2_OPTIMIZE_{symbol}=y\n")
-    assert detect_opt(tmp_path / "out", "v") == expected
-
-
-def test_detect_opt_unknown(tmp_path):
-    write_config(tmp_path, "v", "BR2_x86_64=y\n")
-    assert detect_opt(tmp_path / "out", "v") == "unknown"
-
-
-@pytest.mark.parametrize(
-    "path, expected",
-    [
-        ("board/qemu/x86_64/linux.config", "default"),
-        ("$(BR2_EXTERNAL_CUSTOM_LAYER_PATH)/board/linux-tiny.defconfig", "tiny"),
-        ("board/inne/nieznany.config", "unknown"),
-    ],
-)
-def test_detect_kernel(tmp_path, path, expected):
-    write_config(tmp_path, "v", f'BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="{path}"\n')
-    assert detect_kernel(tmp_path / "out", "v") == expected
-
-
-def test_detect_kernel_without_option(tmp_path):
-    write_config(tmp_path, "v", "BR2_x86_64=y\n")
-    assert detect_kernel(tmp_path / "out", "v") == "unknown"
-
-
-def test_detect_missing_config_raises(tmp_path):
-    with pytest.raises(ExperimentError):
-        detect_opt(tmp_path / "out", "v")
-    with pytest.raises(ExperimentError):
-        detect_kernel(tmp_path / "out", "v")
-
-
-def test_factor_columns_recorded(tmp_path):
-    config = make_config(tmp_path)
-    write_config(tmp_path, "base", "BR2_TOOLCHAIN_BUILDROOT_GLIBC=y\nBR2_OPTIMIZE_S=y\n")
-    write_config(
-        tmp_path,
-        "musl",
-        'BR2_TOOLCHAIN_BUILDROOT_MUSL=y\nBR2_OPTIMIZE_3=y\n'
-        'BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="x/linux-tiny.defconfig"\n',
-    )
-    store = run_experiment(
-        config, qemu_binary=QEMU, runner=fake_runner(SAMPLE.read_text()), log=quiet
-    )
-    rows = read_rows(store)
-    assert {(row["opt"], row["kernel"]) for row in rows if row["variant"] == "base"} == {("Os", "unknown")}
-    assert {(row["opt"], row["kernel"]) for row in rows if row["variant"] == "musl"} == {("O3", "tiny")}
-    meta = json.loads(store.meta_file.read_text(encoding="utf-8"))
-    assert {entry["name"]: entry["opt"] for entry in meta["variants"]} == {"base": "Os", "musl": "O3"}
-
-
 from dataclasses import replace
+
+FRAGMENTS = {
+    ("libc", "glibc"): "BR2_TOOLCHAIN_BUILDROOT_GLIBC=y\n",
+    ("libc", "musl"): "BR2_TOOLCHAIN_BUILDROOT_MUSL=y\n",
+    ("opt", "Os"): "BR2_OPTIMIZE_S=y\n",
+    ("opt", "O3"): "BR2_OPTIMIZE_3=y\n",
+    ("kernel", "default"): 'BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="board/qemu/x86_64/linux.config"\n',
+    ("kernel", "tiny"): 'BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="$(BR2_EXTERNAL_CUSTOM_LAYER_PATH)/board/linux-tiny.defconfig"\n',
+    ("fs", "ext2"): "# BR2_TARGET_ROOTFS_TAR is not set\n",
+}
+
+
+def write_fragments(tmp_path):
+    factors = tmp_path / "custom-layer" / "factors"
+    for (factor, level), text in FRAGMENTS.items():
+        (factors / factor).mkdir(parents=True, exist_ok=True)
+        (factors / factor / f"{level}.fragment").write_text(text)
+
+
+def factor_variant(name, **levels):
+    return Variant(name, None, ", ".join(levels.values()), factors=tuple(levels.items()))
 
 
 def factor_config(tmp_path, declared_libc="glibc", declared_kernel="default"):
     config = make_config(tmp_path)
+    write_fragments(tmp_path)
     write_config(
         tmp_path,
         "base",
@@ -329,16 +291,16 @@ def factor_config(tmp_path, declared_libc="glibc", declared_kernel="default"):
         tmp_path,
         "musl",
         "BR2_TOOLCHAIN_BUILDROOT_MUSL=y\nBR2_OPTIMIZE_3=y\n"
-        'BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="x/linux-tiny.defconfig"\n',
+        'BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="$(BR2_EXTERNAL_CUSTOM_LAYER_PATH)/board/linux-tiny.defconfig"\n',
     )
     variants = (
-        Variant("base", None, "b", libc=declared_libc, opt="Os", kernel=declared_kernel),
-        Variant("musl", None, "m", libc="musl", opt="O3", kernel="tiny"),
+        factor_variant("base", libc=declared_libc, opt="Os", kernel=declared_kernel),
+        factor_variant("musl", libc="musl", opt="O3", kernel="tiny"),
     )
     return replace(config, variants=variants)
 
 
-def test_declared_factors_match_detected(tmp_path, monkeypatch):
+def test_declared_factors_match_fragments(tmp_path, monkeypatch):
     monkeypatch.setattr("orchestrator.experiment.defconfig_sha256", lambda config, variant: "x")
     store = run_experiment(
         factor_config(tmp_path),
@@ -346,13 +308,21 @@ def test_declared_factors_match_detected(tmp_path, monkeypatch):
         runner=fake_runner(SAMPLE.read_text()),
         log=quiet,
     )
-    assert len(read_rows(store)) == 6
+    rows = read_rows(store)
+    assert len(rows) == 6
+    assert {(row["libc"], row["opt"], row["kernel"]) for row in rows if row["variant"] == "musl"} == {
+        ("musl", "O3", "tiny")
+    }
+    meta = json.loads(store.meta_file.read_text(encoding="utf-8"))
+    assert meta["factors"] == ["libc", "opt", "kernel"]
+    assert meta["variants"][1]["factors"] == {"libc": "musl", "opt": "O3", "kernel": "tiny"}
+    assert meta["variants"][1]["libc"] == "musl"
 
 
 def test_declared_libc_mismatch_raises(tmp_path, monkeypatch):
     monkeypatch.setattr("orchestrator.experiment.defconfig_sha256", lambda config, variant: "x")
     config = factor_config(tmp_path, declared_libc="musl")
-    with pytest.raises(ExperimentError, match="zadeklarowano musl"):
+    with pytest.raises(ExperimentError, match="libc=musl: oczekiwano BR2_TOOLCHAIN_BUILDROOT_MUSL=y"):
         run_experiment(config, qemu_binary=QEMU, runner=fake_runner(SAMPLE.read_text()), log=quiet)
     assert not config.results_dir.exists()
 
@@ -360,8 +330,52 @@ def test_declared_libc_mismatch_raises(tmp_path, monkeypatch):
 def test_declared_kernel_mismatch_raises(tmp_path, monkeypatch):
     monkeypatch.setattr("orchestrator.experiment.defconfig_sha256", lambda config, variant: "x")
     config = factor_config(tmp_path, declared_kernel="tiny")
-    with pytest.raises(ExperimentError, match="kernel: zadeklarowano tiny"):
+    with pytest.raises(ExperimentError, match="kernel=tiny"):
         run_experiment(config, qemu_binary=QEMU, runner=fake_runner(SAMPLE.read_text()), log=quiet)
+
+
+def test_option_missing_from_config_raises(tmp_path, monkeypatch):
+    monkeypatch.setattr("orchestrator.experiment.defconfig_sha256", lambda config, variant: "x")
+    config = factor_config(tmp_path)
+    write_config(tmp_path, "base", "BR2_TOOLCHAIN_BUILDROOT_GLIBC=y\n")
+    with pytest.raises(ExperimentError, match="w .config brak opcji"):
+        run_experiment(config, qemu_binary=QEMU, runner=fake_runner(SAMPLE.read_text()), log=quiet)
+
+
+def test_additional_factor_needs_no_code(tmp_path, monkeypatch):
+    monkeypatch.setattr("orchestrator.experiment.defconfig_sha256", lambda config, variant: "x")
+    config = factor_config(tmp_path)
+    variants = tuple(
+        replace(variant, factors=variant.factors + (("fs", "ext2"),)) for variant in config.variants
+    )
+    store = run_experiment(
+        replace(config, variants=variants),
+        qemu_binary=QEMU,
+        runner=fake_runner(SAMPLE.read_text()),
+        log=quiet,
+    )
+    rows = read_rows(store)
+    assert {row["fs"] for row in rows} == {"ext2"}
+    assert list(rows[0]).index("fs") == list(rows[0]).index("kernel") + 1
+
+
+def test_legacy_variants_have_empty_factor_columns(tmp_path, monkeypatch):
+    monkeypatch.setattr("orchestrator.experiment.defconfig_sha256", lambda config, variant: "x")
+    config = factor_config(tmp_path)
+    legacy = Variant("old", "old_defconfig", "old")
+    images = config.out_dir / "old" / "images"
+    images.mkdir(parents=True)
+    (images / "bzImage").write_bytes(b"k")
+    (images / "rootfs.ext2").write_bytes(b"r")
+    write_config(tmp_path, "old", "BR2_TOOLCHAIN_BUILDROOT_GLIBC=y\n")
+    store = run_experiment(
+        replace(config, variants=config.variants + (legacy,)),
+        qemu_binary=QEMU,
+        runner=fake_runner(SAMPLE.read_text()),
+        log=quiet,
+    )
+    rows = [row for row in read_rows(store) if row["variant"] == "old"]
+    assert {(row["libc"], row["opt"], row["kernel"]) for row in rows} == {("", "", "")}
 
 
 from orchestrator.scenarios import DEFAULT_SCENARIOS, Scenario

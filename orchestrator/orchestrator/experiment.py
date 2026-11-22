@@ -12,7 +12,7 @@ from pathlib import Path
 from orchestrator.config import Config, Variant
 from orchestrator.hoststate import busy_percent, idle_probe, read_cpu_times, read_load1
 from orchestrator.parser import ParseError, parse_report
-from orchestrator.variants import defconfig_sha256
+from orchestrator.variants import defconfig_sha256, factor_fragments, fragment_options, option_name, uses_factors
 from orchestrator.qemu_runner import RunResult, run_vm
 from orchestrator.scenarios import HEADLINE_UNIT, headline_column
 from orchestrator.storage import (
@@ -27,10 +27,6 @@ LIBC_PATTERN = re.compile(r"^BR2_TOOLCHAIN_BUILDROOT_(GLIBC|MUSL|UCLIBC)=y$", re
 LIBC_NAMES = {"GLIBC": "glibc", "MUSL": "musl", "UCLIBC": "uclibc-ng"}
 PHASE_LABEL = {"warmup": "rozgrzewka", "measure": "pomiar"}
 HOST_BUSY_WARN_PCT = 5.0
-OPT_PATTERN = re.compile(r"^BR2_OPTIMIZE_(0|1|2|3|G|S|FAST)=y$", re.MULTILINE)
-OPT_NAMES = {"0": "O0", "1": "O1", "2": "O2", "3": "O3", "G": "Og", "S": "Os", "FAST": "Ofast"}
-KERNEL_PATTERN = re.compile(r'^BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="(.*)"$', re.MULTILINE)
-KERNEL_NAMES = {"linux.config": "default", "linux-tiny.defconfig": "tiny"}
 
 
 class ExperimentError(Exception):
@@ -71,42 +67,30 @@ def _buildroot_config(out_dir: Path, variant: str) -> str:
         ) from None
 
 
-def detect_opt(out_dir: Path, variant: str) -> str:
-    match = OPT_PATTERN.search(_buildroot_config(out_dir, variant))
-    return OPT_NAMES[match.group(1)] if match else "unknown"
-
-
-def detect_kernel(out_dir: Path, variant: str) -> str:
-    match = KERNEL_PATTERN.search(_buildroot_config(out_dir, variant))
-    if match is None:
-        return "unknown"
-    return KERNEL_NAMES.get(Path(match.group(1)).name, "unknown")
-
-
-def check_declared_factors(
-    variants: list[Variant],
-    libc: dict[str, str],
-    opt: dict[str, str],
-    kernel: dict[str, str],
-) -> None:
+def check_fragments(config: Config, variants: list[Variant]) -> None:
     for variant in variants:
-        if variant.defconfig is not None:
+        if not uses_factors(variant):
             continue
-        declared = {"libc": variant.libc, "opt": variant.opt, "kernel": variant.kernel}
-        detected = {
-            "libc": libc[variant.name],
-            "opt": opt[variant.name],
-            "kernel": kernel[variant.name],
-        }
-        wrong = [
-            f"{factor}: zadeklarowano {declared[factor]}, w out/{variant.name}/.config jest {detected[factor]}"
-            for factor in declared
-            if declared[factor] != detected[factor]
-        ]
+        actual = {}
+        for line in _buildroot_config(config.out_dir, variant.name).splitlines():
+            name = option_name(line.rstrip())
+            if name is not None:
+                actual[name] = line.rstrip()
+        wrong = []
+        for factor, level, path in factor_fragments(config, variant):
+            try:
+                text = path.read_text(encoding="utf-8")
+            except OSError as error:
+                raise ExperimentError(f"nie można odczytać {path}: {error}") from None
+            for name, line in fragment_options(text):
+                found = actual.get(name)
+                if found == line or (found is None and line.endswith(" is not set")):
+                    continue
+                wrong.append(f"{factor}={level}: oczekiwano {line}, w .config {found or 'brak opcji'}")
         if wrong:
             raise ExperimentError(
-                f"wariant {variant.name} nie zgadza się z opisem czynników ({'; '.join(wrong)}); "
-                "przebuduj wariant (build --clean)"
+                f"wariant {variant.name} nie zgadza się z fragmentami czynników "
+                f"(out/{variant.name}/.config: {'; '.join(wrong)}); przebuduj wariant (build --clean)"
             )
 
 
@@ -222,6 +206,7 @@ def collect_meta(
             "git_dirty": None if git_status is None else bool(git_status),
         },
         "experiment": asdict(config.experiment),
+        "factors": list(config.factor_names),
         "scenarios": [asdict(scenario) for scenario in config.scenarios],
         "variants": [
             {
@@ -230,6 +215,7 @@ def collect_meta(
                 "defconfig": variant.defconfig,
                 "defconfig_sha256": defconfig_sha256(config, variant),
                 "libc": libc[variant.name],
+                "factors": variant.levels,
             }
             for variant in variants
         ],
@@ -250,9 +236,8 @@ def run_experiment(
     variants = select_variants(config, variant_names)
     check_images(config, variants)
     libc = {variant.name: detect_libc(config.out_dir, variant.name) for variant in variants}
-    opt = {variant.name: detect_opt(config.out_dir, variant.name) for variant in variants}
-    kernel = {variant.name: detect_kernel(config.out_dir, variant.name) for variant in variants}
-    check_declared_factors(variants, libc, opt, kernel)
+    check_fragments(config, variants)
+    factors = config.factor_names
     by_name = {variant.name: variant for variant in variants}
     plan = make_plan(
         [variant.name for variant in variants],
@@ -261,11 +246,8 @@ def run_experiment(
         experiment.seed,
     )
     experiment_id = new_experiment_id()
-    store = ExperimentStore(config.results_dir, experiment_id, run_columns(config.scenarios))
+    store = ExperimentStore(config.results_dir, experiment_id, run_columns(config.scenarios, factors))
     meta = collect_meta(config, experiment_id, variants, libc, plan, qemu_binary)
-    for entry in meta["variants"]:
-        entry["opt"] = opt[entry["name"]]
-        entry["kernel"] = kernel[entry["name"]]
     store.write_meta(meta)
     log(f"Eksperyment {experiment_id}: {len(plan)} przebiegów, wyniki w {store.directory}")
     counts: dict[str, int] = {}
@@ -306,9 +288,7 @@ def run_experiment(
                     experiment_id=experiment_id,
                     variant=slot.variant,
                     label=variant.label,
-                    libc=libc[slot.variant],
-                    opt=opt[slot.variant],
-                    kernel=kernel[slot.variant],
+                    factors={factor: variant.levels.get(factor, "") for factor in factors},
                     phase=slot.phase,
                     index=slot.index,
                     order=slot.order,

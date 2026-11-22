@@ -57,6 +57,7 @@ Polecenie wypisuje tabelę średnich i zapisuje w orchestrator/results/20261117-
 
 Skrypt orch uruchamia orkiestrator z właściwego katalogu i interpretera, więc można go wywołać z dowolnego miejsca. Polecenia:
 
+    ./orch check
     ./orch build
     ./orch run
     ./orch analyze
@@ -64,6 +65,7 @@ Skrypt orch uruchamia orkiestrator z właściwego katalogu i interpretera, więc
 
 Opcje ogólne, przed nazwą polecenia: --project-dir (katalog projektu, domyślnie wykrywany względem położenia kodu) i --config (plik konfiguracji). Ścieżki względne w tych opcjach są liczone od katalogu orchestrator/, więc podawaj ścieżki bezwzględne.
 
+- check: wypisuje czynniki z poziomami, warianty ze stanem budowy, scenariusze i ustawienia wykresów oraz sprawdza konfigurację bez budowania: składa defconfig każdego wariantu (powtórzona opcja to błąd), porównuje zbudowane out/NAZWA/.config z fragmentami czynników i ostrzega o brakujących kombinacjach w siatce. Przy błędzie kończy się kodem 1.
 - build: konfiguruje i buduje obrazy. Opcje: --variant NAZWA (można powtarzać, domyślnie wszystkie warianty) i --clean (czysta budowa). Czysta budowa trwała 20-25 minut na wariant na moim sprzęcie, przyrostowa kilkanaście sekund (odświeża overlay). Czasy i rozmiary trafiają do orchestrator/results/builds.csv, a czas budowy ma sens tylko dla budów z --clean. Zmiana opcji w już zbudowanym pakiecie bez --clean bywa pomijana przez Buildroota.
 - run: uruchamia eksperyment na zbudowanych obrazach. Opcje: --variant, --reps N (powtórzenia), --warmup N (rozgrzewka), --qemu BIN.
 - analyze: tabela i wykresy średnich oraz pudełkowe. Opcja --experiment ID.
@@ -78,7 +80,7 @@ Rekomendacja, nie wymóg: czysta budowa wszystkich wariantów trwa kilka godzin,
 
 ## Jak działa pomiar
 
-1. Konfiguracja wariantu: defconfig Buildroota składa się z custom-layer/factors/base.fragment i trzech fragmentów poziomów czynników (libc, opt, kernel). Zduplikowana opcja w dwóch fragmentach to błąd. Wygenerowane defconfigi trafiają do out/_defconfigs/, a katalogi wyjściowe do out/NAZWA/. Przed pomiarem program sprawdza, czy deklarowane czynniki zgadzają się z faktycznym out/NAZWA/.config.
+1. Konfiguracja wariantu: czynnikami są podkatalogi custom-layer/factors/, a poziomami pliki POZIOM.fragment w tych podkatalogach. Defconfig Buildroota składa się z custom-layer/factors/base.fragment i fragmentu wybranego poziomu każdego czynnika. Zduplikowana opcja w dwóch fragmentach to błąd. Wygenerowane defconfigi trafiają do out/_defconfigs/, a katalogi wyjściowe do out/NAZWA/. Przed pomiarem program sprawdza, czy każda opcja z fragmentów wariantu występuje z tą samą wartością w out/NAZWA/.config.
 2. Pojedynczy przebieg: sonda obciążenia hosta przez 1 s (z /proc/stat), potem host otwiera nasłuch TCP na 127.0.0.1 i uruchamia QEMU (-kernel bzImage, dysk rootfs.ext2 przez virtio z snapshot=on, konsola szeregowa, KVM). Parametry dla gościa (liczba wątków, port, scenariusze) idą w linii poleceń jądra.
 3. Gość: skrypt S99benchmark (custom-layer/board/overlay/etc/init.d/) czyta /proc/cmdline, wypisuje na konsolę BOOT_DONE, zapisuje MemTotal i MemAvailable, uruchamia scenariusze Sysbench i wysyła raport przez nc na 10.0.2.2 (host widziany z sieci użytkownika QEMU), po czym wyłącza system.
 4. Dwa zegary rozruchu: boot_host_s (host: od startu procesu QEMU do linii BOOT_DONE na konsoli) i boot_uptime_s (gość: /proc/uptime w skrypcie startowym). Oba kończą się w skrypcie startowym, a nie w gotowości usług.
@@ -92,20 +94,31 @@ Siatka 2x3x2 = 12 wariantów: libc (glibc, musl), optymalizacja (O2, O3, Os), j�
 
 Scenariusze Sysbench (testy cpu i memory): cpu (2 wątki, cpu-max-prime=20000), mem (zapis, blok 64M, 10 s), mem_read (odczyt) i cpu_1t (1 wątek).
 
-Dodawanie wariantu: wpis [[variant]] w orchestrator/variants.toml z nazwą i trzema poziomami czynników. Nowy poziom czynnika to nowy plik custom-layer/factors/CZYNNIK/POZIOM.fragment. Dodawanie scenariusza: wpis [[scenario]] (przykłady w variants.toml). Opcje Sysbencha pochodzą z białej listy, scenariusze są kodowane w linii poleceń jądra (limit 1200 znaków, wartości tylko z znaków A-Za-z0-9._), a nazwa scenariusza staje się przedrostkiem kolumn w runs.csv.
+Dodawanie wariantu: wpis [[variant]] w orchestrator/variants.toml z nazwą i poziomem każdego czynnika (kolejność czynników w kolumnach wyników i etykietach wynika z kolejności kluczy w pierwszym wariancie). Nowy poziom czynnika to nowy plik custom-layer/factors/CZYNNIK/POZIOM.fragment. Nowy czynnik to nowy podkatalog custom-layer/factors/CZYNNIK/ z fragmentami poziomów; po jego dodaniu każdy wariant musi podać poziom tego czynnika. Po zmianach warto uruchomić ./orch check. Dodawanie scenariusza: wpis [[scenario]] (przykłady w variants.toml). Opcje Sysbencha pochodzą z białej listy, scenariusze są kodowane w linii poleceń jądra (limit 1200 znaków, wartości tylko z znaków A-Za-z0-9._), a nazwa scenariusza staje się przedrostkiem kolumn w runs.csv.
+
+## Wykresy
+
+Wygląd wykresów ustawia opcjonalna sekcja [plot] w orchestrator/variants.toml:
+
+- columns, rows: układ paneli (jeden panel na scenariusz lub wielkość systemową). Bez nich układ dobierany jest automatycznie, np. 7 paneli to 3x3, 16 paneli to 4x4.
+- color_by, colors: czynnik, którego poziomy wyznaczają kolor, i opcjonalne kolory poziomów (nazwy lub kody matplotlib). Domyślnie kolor według pierwszego czynnika.
+- hatch_by, hatches: czynnik, którego poziomy wyznaczają kreskowanie, i opcjonalne wzory poziomów. Domyślnie bez kreskowania.
+- order, sort_by: kolejność poziomów wybranych czynników i kolejność czynników przy sortowaniu wariantów na osi.
+
+Dołączony variants.toml ustawia 4 kolumny, kolor według libc, kreskowanie jądra tiny oraz sortowanie według jądra, biblioteki i poziomu optymalizacji (O2, O3, Os).
 
 ## Wyniki
 
 Każdy eksperyment tworzy katalog orchestrator/results/RRRRMMDD-GGMMSS/ z plikami:
 
 - runs.csv: wiersz na przebieg, dopisywany od razu z fsync (przerwana kampania nie gubi zapisanych wierszy). Kolumny: identyfikatory, czynniki, faza, status, boot_host_s, boot_uptime_s, pamięć gościa, sonda obciążenia hosta i metryki scenariuszy.
-- meta.json: wersje narzędzi, dane hosta, scenariusze i plan kampanii.
+- meta.json: wersje narzędzi, dane hosta, czynniki i ich poziomy w wariantach, scenariusze i plan kampanii.
 - raw/: surowe raporty i logi konsoli.
 - analysis/: wyniki polecenia analyze.
 
 ## Testy
 
-234 testy z atrapami zamiast QEMU (test_guest.py uruchamia prawdziwy S99benchmark z atrapą Sysbencha). Pokrycie kodu mierzy się z katalogu orchestrator:
+261 testów z atrapami zamiast QEMU (test_guest.py uruchamia prawdziwy S99benchmark z atrapą Sysbencha). Pokrycie kodu mierzy się z katalogu orchestrator:
 
     cd orchestrator && ../.venv/bin/python -m pytest -q --cov=orchestrator --cov-report=term-missing
 
@@ -114,7 +127,7 @@ Pokrycie całego pakietu wyniosło ok. 90% przy pierwszym pomiarze. Najniższe m
 ## Struktura repozytorium
 
 - orch: skrypt uruchamiający.
-- orchestrator/orchestrator/: kod (cli, config, variants, scenarios, builder, qemu_runner, parser, storage, hoststate, experiment, averages).
+- orchestrator/orchestrator/: kod (cli, config, variants, scenarios, builder, qemu_runner, parser, storage, hoststate, experiment, averages, check).
 - orchestrator/variants.toml: konfiguracja eksperymentu, wariantów i scenariuszy.
 - orchestrator/tests/: testy (tests/data to próbki raportów).
 - orchestrator/results/: wyniki (dwie kampanie i builds.csv).

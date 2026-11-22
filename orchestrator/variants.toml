@@ -10,6 +10,15 @@ seed = 42
 cpu_affinity = ""
 max_idle_busy_pct = 10
 
+[plot]
+columns = 4
+color_by = "libc"
+hatch_by = "kernel"
+colors = { glibc = "tab:blue", musl = "tab:orange" }
+hatches = { tiny = "//" }
+order = { opt = ["O2", "O3", "Os"] }
+sort_by = ["kernel", "libc", "opt"]
+
 [[variant]]
 name = "base"
 libc = "glibc"

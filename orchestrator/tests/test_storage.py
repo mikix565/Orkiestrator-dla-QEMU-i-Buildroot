@@ -37,7 +37,7 @@ def make_row(run_id="e_base_r01", status="ok", report=None):
         experiment_id="e",
         variant="base",
         label="glibc",
-        libc="glibc",
+        factors={"libc": "glibc", "opt": "O2", "kernel": "default"},
         phase="measure",
         index=1,
         order=1,
@@ -137,6 +137,17 @@ def test_factor_columns_exist():
 
 from orchestrator.scenarios import DEFAULT_SCENARIOS, Scenario, scenario_columns
 from orchestrator.storage import run_columns
+
+
+def test_run_columns_follow_given_factors():
+    columns = run_columns(DEFAULT_SCENARIOS, ("libc", "fs"))
+    assert columns[4:6] == ("libc", "fs")
+    assert "kernel" not in columns
+
+
+def test_run_columns_reject_factor_named_like_column():
+    with pytest.raises(StorageError):
+        run_columns(DEFAULT_SCENARIOS, ("status",))
 
 EXTENDED = DEFAULT_SCENARIOS + (Scenario("mem_read", "memory", (("memory-oper", "read"),)),)
 

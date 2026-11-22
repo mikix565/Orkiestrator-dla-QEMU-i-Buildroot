@@ -5,6 +5,7 @@ from pathlib import Path
 
 from orchestrator.averages import AnalysisError, run_averages
 from orchestrator.builder import BuilderError, build_all
+from orchestrator.check import run_check
 from orchestrator.config import (
     Config,
     ConfigError,
@@ -71,6 +72,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="identyfikator eksperymentu (domyślnie najnowszy)",
     )
 
+    subparsers.add_parser(
+        "check",
+        help="wypisz czynniki, warianty i scenariusze oraz sprawdź konfigurację (bez budowania)",
+    )
+
     everything = subparsers.add_parser(
         "all", help="zbuduj warianty, zmierz je i pokaż średnie wyniki jednym poleceniem"
     )
@@ -98,6 +104,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         project = find_project_dir(args.project_dir, DEFAULT_PROJECT_DIR, ask)
         config = load_config(project, args.config)
+        if args.command == "check":
+            return run_check(config)
         if args.command == "analyze":
             run_averages(config, args.experiment)
             return 0
