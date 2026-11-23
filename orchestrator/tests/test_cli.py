@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from orchestrator import cli
-from orchestrator.averages import AnalysisError
+from orchestrator.analysis import AnalysisError
 from orchestrator.config import ConfigError, load_config
 from orchestrator.experiment import ExperimentError
 
@@ -39,7 +39,7 @@ def record_calls(monkeypatch):
 
     monkeypatch.setattr(cli, "run_experiment", fake_run)
     monkeypatch.setattr(
-        cli, "run_averages", lambda config, experiment_id: calls.append(("averages", experiment_id))
+        cli, "run_analysis", lambda config, experiment_id: calls.append(("analysis", experiment_id))
     )
     return calls
 
@@ -148,11 +148,11 @@ def test_parser_analyze_option():
     assert args.experiment == "20261027-212235"
 
 
-def test_main_analyze_calls_run_averages(tmp_path, monkeypatch):
+def test_main_analyze_calls_run_analysis(tmp_path, monkeypatch):
     project = make_project(tmp_path)
     captured = []
     monkeypatch.setattr(
-        cli, "run_averages", lambda config, experiment_id: captured.append(experiment_id)
+        cli, "run_analysis", lambda config, experiment_id: captured.append(experiment_id)
     )
     arguments = ["--project-dir", str(project), "analyze", "--experiment", "20261027-212235"]
     assert cli.main(arguments) == 0
@@ -163,7 +163,7 @@ def test_main_analyze_defaults_to_latest_experiment(tmp_path, monkeypatch):
     project = make_project(tmp_path)
     captured = []
     monkeypatch.setattr(
-        cli, "run_averages", lambda config, experiment_id: captured.append(experiment_id)
+        cli, "run_analysis", lambda config, experiment_id: captured.append(experiment_id)
     )
     assert cli.main(["--project-dir", str(project), "analyze"]) == 0
     assert captured == [None]
@@ -192,7 +192,7 @@ def test_parser_all_options():
     )
 
 
-def test_main_all_runs_build_run_averages_in_order(tmp_path, monkeypatch, capsys):
+def test_main_all_runs_build_run_analysis_in_order(tmp_path, monkeypatch, capsys):
     project = make_project(tmp_path)
     calls = record_calls(monkeypatch)
     arguments = ["--project-dir", str(project), "all", "--variant", "base", "--clean", "--reps", "3"]
@@ -200,7 +200,7 @@ def test_main_all_runs_build_run_averages_in_order(tmp_path, monkeypatch, capsys
     assert calls == [
         ("build", ["base"], True),
         ("run", 3, ["base"], "qemu-system-x86_64"),
-        ("averages", EXPERIMENT_ID),
+        ("analysis", EXPERIMENT_ID),
     ]
     output = capsys.readouterr().out
     assert "Pomiary zakończone" in output
@@ -224,7 +224,7 @@ def test_main_all_analysis_error_reports_after_measurements(tmp_path, monkeypatc
     def failing(config, experiment_id):
         raise AnalysisError("brak danych")
 
-    monkeypatch.setattr(cli, "run_averages", failing)
+    monkeypatch.setattr(cli, "run_analysis", failing)
     assert cli.main(["--project-dir", str(project), "all"]) == 1
     captured = capsys.readouterr()
     assert "Pomiary zakończone" in captured.out

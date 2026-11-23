@@ -389,7 +389,7 @@ def plot_boxplots(
     return save_figure(figure, directory, "boxplots")
 
 
-def run_averages(
+def run_analysis(
     config: Config,
     experiment_id: str | None = None,
     log: Callable[[str], None] = print,

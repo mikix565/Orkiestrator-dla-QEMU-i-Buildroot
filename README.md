@@ -127,7 +127,7 @@ Pokrycie całego pakietu wyniosło ok. 90% przy pierwszym pomiarze. Najniższe m
 ## Struktura repozytorium
 
 - orch: skrypt uruchamiający.
-- orchestrator/orchestrator/: kod (cli, config, variants, scenarios, builder, qemu_runner, parser, storage, hoststate, experiment, averages, check).
+- orchestrator/orchestrator/: kod (cli, config, variants, scenarios, builder, qemu_runner, parser, storage, hoststate, experiment, analysis, check).
 - orchestrator/variants.toml: konfiguracja eksperymentu, wariantów i scenariuszy.
 - orchestrator/tests/: testy (tests/data to próbki raportów).
 - orchestrator/results/: wyniki (dwie kampanie i builds.csv).

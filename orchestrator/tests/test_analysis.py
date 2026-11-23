@@ -3,7 +3,7 @@ import json
 import pandas as pd
 import pytest
 
-from orchestrator.averages import (
+from orchestrator.analysis import (
     AnalysisError,
     compute_averages,
     compute_stats,
@@ -15,7 +15,7 @@ from orchestrator.averages import (
     panels_for,
     plot_boxplots,
     read_runs,
-    run_averages,
+    run_analysis,
     scenario_pairs,
     split_by_host_load,
 )
@@ -215,12 +215,12 @@ def test_scenario_pairs_malformed_meta(tmp_path):
         scenario_pairs(tmp_path)
 
 
-def test_run_averages_writes_files(tmp_path):
+def test_run_analysis_writes_files(tmp_path):
     config = make_config(tmp_path)
     directory = config.results_dir / "20261027-212235"
     write_runs(directory)
     messages = []
-    table = run_averages(config, "20261027-212235", log=messages.append)
+    table = run_analysis(config, "20261027-212235", log=messages.append)
     output = directory / "analysis"
     for name in (
         "averages.csv",
@@ -265,11 +265,11 @@ def test_compute_stats_values():
     assert b["median"] == 7.0
 
 
-def test_run_averages_writes_stats(tmp_path):
+def test_run_analysis_writes_stats(tmp_path):
     config = make_config(tmp_path)
     directory = config.results_dir / "20261027-212235"
     write_runs(directory)
-    run_averages(config, "20261027-212235", log=lambda message: None)
+    run_analysis(config, "20261027-212235", log=lambda message: None)
     stats = pd.read_csv(directory / "analysis" / "stats.csv")
     assert list(stats.columns) == [
         "variant", "metric", "n", "mean", "std", "median", "q1", "q3", "min", "max"
@@ -287,35 +287,35 @@ def test_run_averages_writes_stats(tmp_path):
     assert row["max"] == pytest.approx(1.2)
 
 
-def test_run_averages_excludes_noisy_runs(tmp_path):
+def test_run_analysis_excludes_noisy_runs(tmp_path):
     config = make_config(tmp_path)
     directory = config.results_dir / "20261027-212235"
     write_runs(directory)
     frame = pd.read_csv(directory / "runs.csv")
     frame.loc[frame["run_id"] == "base_0", "host_idle_busy_pct"] = 50.0
     frame.to_csv(directory / "runs.csv", index=False)
-    table = run_averages(config, log=lambda message: None)
+    table = run_analysis(config, log=lambda message: None)
     assert table.loc["base", "n"] == 2
     assert table.loc["base", "boot_host_s"] == pytest.approx(1.15)
     assert table.loc["os", "n"] == 3
 
 
-def test_run_averages_missing_scenario_column_raises(tmp_path):
+def test_run_analysis_missing_scenario_column_raises(tmp_path):
     config = make_config(tmp_path)
     write_runs(config.results_dir / "20261027-212235", with_extra=False)
     with pytest.raises(AnalysisError, match="brak kolumn"):
-        run_averages(config, log=lambda message: None)
+        run_analysis(config, log=lambda message: None)
 
 
-def test_run_averages_rejects_unsafe_id(tmp_path):
+def test_run_analysis_rejects_unsafe_id(tmp_path):
     with pytest.raises(AnalysisError):
-        run_averages(make_config(tmp_path), "../x")
+        run_analysis(make_config(tmp_path), "../x")
 
 
-def test_run_averages_without_factor_columns(tmp_path):
+def test_run_analysis_without_factor_columns(tmp_path):
     config = make_config(tmp_path)
     write_runs(config.results_dir / "20261027-212235", with_factors=False, with_meta=False)
-    table = run_averages(config, log=lambda message: None)
+    table = run_analysis(config, log=lambda message: None)
     assert list(table.index) == ["base", "musl_os_tiny", "os"]
     assert "libc" not in table.columns
 
@@ -391,7 +391,7 @@ def test_plot_boxplots_marks_every_run(tmp_path, monkeypatch):
     table = table.loc[order_variants(table)]
     figures = []
     monkeypatch.setattr(
-        "orchestrator.averages.save_figure",
+        "orchestrator.analysis.save_figure",
         lambda figure, target, name: figures.append(figure) or [],
     )
     plot_boxplots(frame, table, panels, directory, "test")

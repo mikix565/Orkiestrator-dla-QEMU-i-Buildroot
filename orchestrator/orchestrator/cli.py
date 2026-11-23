@@ -3,7 +3,7 @@ import sys
 from dataclasses import asdict, replace
 from pathlib import Path
 
-from orchestrator.averages import AnalysisError, run_averages
+from orchestrator.analysis import AnalysisError, run_analysis
 from orchestrator.builder import BuilderError, build_all
 from orchestrator.check import run_check
 from orchestrator.config import (
@@ -107,7 +107,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "check":
             return run_check(config)
         if args.command == "analyze":
-            run_averages(config, args.experiment)
+            run_analysis(config, args.experiment)
             return 0
         if args.command in ("build", "all"):
             results = build_all(config, args.variants, args.clean)
@@ -124,7 +124,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Gotowe: {store.directory}")
             return 0
         print(f"Pomiary zakończone: {store.directory}")
-        run_averages(config, store.experiment_id)
+        run_analysis(config, store.experiment_id)
         print(f"Gotowe: {store.directory}")
         return 0
     except (AnalysisError, BuilderError, ConfigError, ExperimentError, RunnerError, StorageError) as error:
