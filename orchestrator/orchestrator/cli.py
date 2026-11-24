@@ -65,7 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_clean(build)
 
     analyze = subparsers.add_parser(
-        "analyze", help="pokaż średnie wyniki benchmarków i czasu rozruchu (tabela i wykres)"
+        "analyze", help="przeanalizuj wyniki kampanii: średnie, statystyki opisowe, wykresy słupkowe i pudełkowe"
     )
     analyze.add_argument(
         "--experiment",
@@ -78,7 +78,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     everything = subparsers.add_parser(
-        "all", help="zbuduj warianty, zmierz je i pokaż średnie wyniki jednym poleceniem"
+        "all", help="zbuduj warianty, zmierz je i przeanalizuj wyniki jednym poleceniem"
     )
     _add_variants(everything, "przetworzenia")
     _add_clean(everything)
